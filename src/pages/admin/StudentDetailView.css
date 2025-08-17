@@ -1,0 +1,531 @@
+.student-detail-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.student-detail-modal {
+  background: white;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 1000px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.5rem;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.modal-tabs {
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+  background: white;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 1rem 2rem;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #6b7280;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  color: #374151;
+  background: #f9fafb;
+}
+
+.tab-btn.active {
+  color: #0ea5e9;
+  border-bottom-color: #0ea5e9;
+  background: #f0f9ff;
+}
+
+.modal-content {
+  padding: 2rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* Personal Info Styles */
+.personal-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.info-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.info-item label {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.info-item span {
+  color: #1f2937;
+  padding: 0.5rem;
+  background: #f9fafb;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.contact-info h4 {
+  margin: 0 0 1rem 0;
+  color: #1e293b;
+  font-size: 1.1rem;
+}
+
+/* Fee Catalog Styles */
+.fee-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.fee-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.fee-summary-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.fee-summary-card h4 {
+  margin: 0 0 0.5rem 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.fee-summary-card .amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.fee-summary-card.paid {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.fee-summary-card.paid .amount {
+  color: #059669;
+}
+
+.fee-summary-card.pending {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.fee-summary-card.pending .amount {
+  color: #d97706;
+}
+
+.fee-summary-card.overdue {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.fee-summary-card.overdue .amount {
+  color: #dc2626;
+}
+
+.fee-calendar h4 {
+  margin: 0 0 1rem 0;
+  color: #1e293b;
+  font-size: 1.1rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.calendar-month {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem 0.5rem;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.calendar-month:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.calendar-month.paid {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.calendar-month.overdue {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.calendar-month.pending {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.month-name {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.month-status {
+  margin-bottom: 0.5rem;
+}
+
+.status-paid {
+  color: #059669;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.status-overdue {
+  color: #dc2626;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.status-pending {
+  color: #d97706;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.month-amount {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.fee-details h4 {
+  margin: 0 0 1rem 0;
+  color: #1e293b;
+  font-size: 1.1rem;
+}
+
+.fee-table {
+  overflow-x: auto;
+}
+
+.fee-table table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.fee-table th,
+.fee-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.fee-table th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.fee-table td {
+  color: #1f2937;
+  font-size: 0.9rem;
+}
+
+/* Fee Row Colors */
+.fee-row.paid {
+  background-color: #f0fdf4;
+}
+
+.fee-row.overdue {
+  background-color: #fef2f2;
+}
+
+.fee-row.pending {
+  background-color: #fef2f2;
+}
+
+.fee-row.paid:hover {
+  background-color: #dcfce7;
+}
+
+.fee-row.overdue:hover {
+  background-color: #fee2e2;
+}
+
+.fee-row.pending:hover {
+  background-color: #fee2e2;
+}
+
+/* Academic Info Styles */
+.academic-info h4 {
+  margin: 0 0 1rem 0;
+  color: #1e293b;
+  font-size: 1.1rem;
+}
+
+.academic-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+/* Modal Footer */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 1.5rem 2rem;
+  border-top: 1px solid #e5e7eb;
+  background: #f8fafc;
+  min-height: 80px;
+}
+
+.footer-buttons {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.footer-buttons .action-btn {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.75rem 1.5rem;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  line-height: 1;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.footer-buttons .action-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+/* Common Components */
+.action-btn {
+  background: #0ea5e9;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  font-weight: 500;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  text-decoration: none;
+  line-height: 1;
+  box-sizing: border-box;
+}
+
+.action-btn:hover {
+  background: #0284c7;
+  transform: translateY(-1px);
+}
+
+.action-btn.secondary {
+  background: #6b7280;
+}
+
+.action-btn.secondary:hover {
+  background: #4b5563;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: white;
+}
+
+.status-badge.paid {
+  background: #10b981;
+}
+
+.status-badge.pending {
+  background: #ef4444;
+}
+
+.status-badge.overdue {
+  background: #ef4444;
+}
+
+/* Fee Catalog Colors Update */
+.calendar-month.paid {
+  border-color: #10b981;
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.calendar-month.overdue {
+  border-color: #ef4444;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.calendar-month.pending {
+  border-color: #ef4444;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .student-detail-modal {
+    max-width: 95vw;
+    margin: 10px;
+  }
+  
+  .modal-header,
+  .modal-content,
+  .modal-footer {
+    padding: 1rem;
+  }
+  
+  .modal-tabs {
+    overflow-x: auto;
+  }
+  
+  .tab-btn {
+    padding: 0.75rem 1rem;
+    white-space: nowrap;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .fee-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .calendar-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .academic-actions {
+    flex-direction: column;
+  }
+  
+  .modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .footer-buttons {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .modal-footer .action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+} 

@@ -1,18 +1,113 @@
 {
-  "studentId": "1",
-  "studentName": "Rahul Kumar",
-  "class": "10th A",
-  "term": "Mid Term",
-  "sessionYear": "2024-2025",
-  "results": [
-    { "subject": "Mathematics", "marks": 85, "total": 100, "percentage": 85, "grade": "A" },
-    { "subject": "Science", "marks": 88, "total": 100, "percentage": 88, "grade": "A" },
-    { "subject": "English", "marks": 78, "total": 100, "percentage": 78, "grade": "B+" },
-    { "subject": "Social Science", "marks": 82, "total": 100, "percentage": 82, "grade": "A" },
-    { "subject": "Hindi", "marks": 80, "total": 100, "percentage": 80, "grade": "A" }
+  "version": "1.1.0",
+  "resultId": "res-2025-midterm-0001",
+  "student": {
+    "id": "1",
+    "name": "Rahul Kumar",
+    "pan": "PAN123456",
+    "rollNumber": 12,
+    "class": "10",
+    "section": "A"
+  },
+  "exam": {
+    "term": "Mid Term",
+    "sessionYear": "2024-2025",
+    "examDateRange": { "from": "2025-01-05", "to": "2025-01-12" },
+    "publishedAt": "2025-01-15T10:00:00Z",
+    "publishedBy": "Examination Department"
+  },
+  "grading": {
+    "scale": ["A+","A","B+","B","C","D","E"],
+    "passMarks": 33,
+    "totalMaxMarks": 500,
+    "calculationMethod": "percentage"
+  },
+  "subjects": [
+    {
+      "subjectCode": "MAT10",
+      "subjectName": "Mathematics",
+      "components": [
+        { "name": "Theory", "marks": 70, "max": 80 },
+        { "name": "Practical", "marks": 15, "max": 20 }
+      ],
+      "total": { "marks": 85, "max": 100 },
+      "percentage": 85,
+      "grade": "A",
+      "gradePoint": 9,
+      "teacher": "Dr. Verma",
+      "remarks": "Good grasp of algebra"
+    },
+    {
+      "subjectCode": "SCI10",
+      "subjectName": "Science",
+      "components": [
+        { "name": "Theory", "marks": 72, "max": 80 },
+        { "name": "Practical", "marks": 16, "max": 20 }
+      ],
+      "total": { "marks": 88, "max": 100 },
+      "percentage": 88,
+      "grade": "A",
+      "gradePoint": 9,
+      "teacher": "Mr. Singh"
+    },
+    {
+      "subjectCode": "ENG10",
+      "subjectName": "English",
+      "components": [
+        { "name": "Theory", "marks": 78, "max": 100 }
+      ],
+      "total": { "marks": 78, "max": 100 },
+      "percentage": 78,
+      "grade": "B+",
+      "gradePoint": 8
+    },
+    {
+      "subjectCode": "SST10",
+      "subjectName": "Social Science",
+      "components": [
+        { "name": "Theory", "marks": 82, "max": 100 }
+      ],
+      "total": { "marks": 82, "max": 100 },
+      "percentage": 82,
+      "grade": "A",
+      "gradePoint": 9
+    },
+    {
+      "subjectCode": "HIN10",
+      "subjectName": "Hindi",
+      "components": [
+        { "name": "Theory", "marks": 80, "max": 100 }
+      ],
+      "total": { "marks": 80, "max": 100 },
+      "percentage": 80,
+      "grade": "A",
+      "gradePoint": 9
+    }
   ],
-  "overallPercentage": 83,
-  "overallGrade": "A",
-  "publishedAt": "2025-01-15T10:00:00Z",
-  "downloadUrl": "https://example.com/results/1/mid-term.pdf"
+  "summary": {
+    "totalMarksObtained": 413,
+    "totalMaxMarks": 500,
+    "overallPercentage": 83,
+    "cgpa": 8.6,
+    "overallGrade": "A",
+    "status": "pass",
+    "rank": 5
+  },
+  "attendance": {
+    "workingDays": 120,
+    "presentDays": 110,
+    "attendancePercentage": 91.7
+  },
+  "notes": [
+    "Grades computed as per CBSE guidelines.",
+    "Contact class teacher for re-evaluation window."
+  ],
+  "attachments": [
+    { "type": "pdf", "name": "Result Slip", "url": "https://example.com/results/1/mid-term.pdf" }
+  ],
+  "signature": {
+    "signedBy": "Principal",
+    "signedAt": "2025-01-15T10:00:00Z",
+    "checksum": "sha256-2c6b97fb..."
+  }
 }

@@ -1,0 +1,18 @@
+{
+  "studentId": "1",
+  "studentName": "Rahul Kumar",
+  "class": "10th A",
+  "term": "Mid Term",
+  "sessionYear": "2024-2025",
+  "results": [
+    { "subject": "Mathematics", "marks": 85, "total": 100, "percentage": 85, "grade": "A" },
+    { "subject": "Science", "marks": 88, "total": 100, "percentage": 88, "grade": "A" },
+    { "subject": "English", "marks": 78, "total": 100, "percentage": 78, "grade": "B+" },
+    { "subject": "Social Science", "marks": 82, "total": 100, "percentage": 82, "grade": "A" },
+    { "subject": "Hindi", "marks": 80, "total": 100, "percentage": 80, "grade": "A" }
+  ],
+  "overallPercentage": 83,
+  "overallGrade": "A",
+  "publishedAt": "2025-01-15T10:00:00Z",
+  "downloadUrl": "https://example.com/results/1/mid-term.pdf"
+}

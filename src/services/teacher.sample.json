@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "teacher": {
+    "id": "1",
+    "name": "Dr. Sunita Verma",
+    "mobileNumber": "9876543210",
+    "email": "teacher@slms.com",
+    "qualification": "Ph.D. in Mathematics",
+    "designation": "Senior Mathematics Teacher",
+    "currentSchool": "SLMS School"
+  },
+  "assignedClasses": [
+    { "id": "1", "className": "10th", "section": "A", "subject": "Mathematics", "periodNumber": 1, "startTime": "08:00", "endTime": "08:45", "dayOfWeek": "Monday", "totalStudents": 35 }
+  ],
+  "studentQueries": [
+    { "id": "1", "studentName": "Rahul Kumar", "studentClass": "10th", "section": "A", "subject": "Mathematics", "question": "Can you explain the quadratic formula again?", "timestamp": "2024-01-15 10:30", "status": "pending" }
+  ],
+  "videoLectures": [
+    { "id": "1", "title": "Introduction to Algebra", "className": "9th", "section": "A", "subject": "Mathematics", "description": "Basic concepts of algebra and variables", "videoUrl": "#", "thumbnailUrl": "📹", "uploadDate": "2024-01-10", "duration": "45:00", "views": 45 }
+  ],
+  "leaveRequests": [
+    { "id": "1", "studentName": "Amit Patel", "studentClass": "10th", "section": "A", "reason": "Family function", "startDate": "2024-01-20", "endDate": "2024-01-22", "requestDate": "2024-01-15", "status": "pending" }
+  ],
+  "studentResults": [
+    { "id": "1", "studentName": "Rahul Kumar", "studentClass": "10th", "section": "A", "subject": "Mathematics", "examType": "Mid Term", "examDate": "2024-01-10", "marks": 85, "totalMarks": 100, "percentage": 85, "grade": "A" }
+  ],
+  "classStudents": [
+    { "id": "1", "name": "Rahul Kumar", "parentName": "Rajesh Kumar", "mobileNumber": "9876543210", "currentClass": "10th", "section": "A", "feeStatus": "paid", "attendance": { "present": 45, "absent": 5, "total": 50 }, "performance": { "averageScore": 85, "grade": "A" } }
+  ],
+  "notifications": [
+    { "id": "1", "type": "tc_approval", "title": "TC Approval Required", "message": "Admin has requested your approval for Rahul Kumar's transfer certificate", "timestamp": "2024-01-15 14:30", "isRead": false, "priority": "high", "relatedData": { "studentId": "1", "studentName": "Rahul Kumar", "tcRequestId": "tc001" } }
+  ],
+  "tcApprovalRequests": [
+    { "id": "tc001", "studentId": "1", "studentName": "Rahul Kumar", "studentClass": "10th", "section": "A", "reason": "Family relocation to another city", "requestDate": "2024-01-15", "adminMessage": "Please review this transfer certificate request.", "adminName": "Principal", "status": "pending" }
+  ]
+}

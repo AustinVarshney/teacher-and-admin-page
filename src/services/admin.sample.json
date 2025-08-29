@@ -1,0 +1,63 @@
+{
+  "version": "1.0.0",
+  "students": [
+    {
+      "id": "1",
+      "name": "Rahul Kumar",
+      "section": "A",
+      "classRollNumber": 1,
+      "feeStatus": "paid",
+      "feeCatalogStatus": "up_to_date",
+      "currentClass": "10th",
+      "parentName": "Rajesh Kumar",
+      "mobileNumber": "9876543210",
+      "dateOfBirth": "2008-05-15",
+      "gender": "male",
+      "address": "123 Main Street, New Delhi, India",
+      "emergencyContact": "9876543211",
+      "bloodGroup": "B+",
+      "admissionDate": "2020-04-01",
+      "previousSchool": "Delhi Public School"
+    }
+  ],
+  "feeCatalogs": [
+    {
+      "studentId": "1",
+      "monthlyFees": [
+        { "month": "January", "year": 2024, "amount": 5000, "dueDate": "2024-01-15", "status": "paid", "paymentDate": "2024-01-10", "receiptNumber": "R001" },
+        { "month": "February", "year": 2024, "amount": 5000, "dueDate": "2024-02-15", "status": "paid", "paymentDate": "2024-02-12", "receiptNumber": "R002" }
+      ],
+      "totalAmount": 60000,
+      "totalPaid": 55000,
+      "totalPending": 5000,
+      "totalOverdue": 0
+    }
+  ],
+  "teachingStaff": [
+    {
+      "id": "1",
+      "name": "Dr. Sunita Verma",
+      "designation": "Principal",
+      "salaryGrade": "A1",
+      "contactNumber": "9876543201",
+      "email": "principal@slms.com",
+      "qualification": "Ph.D. Education",
+      "assignedClasses": ["All Classes"]
+    }
+  ],
+  "nonTeachingStaff": [
+    { "id": "1", "name": "Mohan Lal", "designation": "Accountant", "contactNumber": "9876543301", "email": "accountant@slms.com" }
+  ],
+  "transferCertificates": [
+    { "id": "1", "studentName": "Rahul Kumar", "studentClass": "10th A", "requestDate": "2024-01-15", "status": "pending", "reason": "Family relocation" }
+  ],
+  "events": [
+    { "id": "1", "title": "Annual Sports Day", "date": "2024-02-15", "type": "sports", "description": "Annual sports competition for all classes" }
+  ],
+  "messages": [
+    { "id": "1", "from": "Teacher", "subject": "Leave Request Approval", "content": "New leave request from student Rahul Kumar", "timestamp": "2024-01-15 10:30", "isRead": false }
+  ],
+  "classes": [
+    { "className": "10th", "section": "A", "totalStudents": 35, "feeCollectionRate": 85 }
+  ]
+}

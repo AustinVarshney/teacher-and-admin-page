@@ -109,5 +109,31 @@
     "signedBy": "Principal",
     "signedAt": "2025-01-15T10:00:00Z",
     "checksum": "sha256-2c6b97fb..."
-  }
+  },
+  "previousSchooling": [
+    {
+      "classLabel": "9th",
+      "schoolName": "Delhi Public School",
+      "passingYear": "2024",
+      "percentage": "85%",
+      "grade": "A",
+      "gallery": [
+        { "id": "pg1", "title": "Class Photo", "imageUrl": "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=400&q=80&auto=format&fit=crop" }
+      ],
+      "resultUrl": "https://example.com/results/1/9th.pdf",
+      "certificateUrl": "https://example.com/results/1/9th-certificate.pdf"
+    },
+    {
+      "classLabel": "8th",
+      "schoolName": "Delhi Public School",
+      "passingYear": "2023",
+      "percentage": "88%",
+      "grade": "A",
+      "gallery": [
+        { "id": "pg2", "title": "Science Project", "imageUrl": "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?w=400&q=80&auto=format&fit=crop" }
+      ],
+      "resultUrl": "https://example.com/results/1/8th.pdf",
+      "certificateUrl": "https://example.com/results/1/8th-certificate.pdf"
+    }
+  ]
 }

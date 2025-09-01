@@ -5,6 +5,7 @@ import './App.css'
 // Student Pages
 import StudentLogin from './pages/student/StudentLogin'
 import StudentDashboard from './pages/student/StudentDashboard'
+import StudentRegistration from './pages/student/StudentRegistration'
 
 // Admin Pages
 import AdminLogin from './pages/admin/AdminLogin'
@@ -13,6 +14,7 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 // Teacher Pages
 import TeacherLogin from './pages/teacher/TeacherLogin'
 import TeacherDashboard from './pages/teacher/TeacherDashboard'
+import TeacherRegistration from './pages/teacher/TeacherRegistration'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -51,6 +53,18 @@ function App() {
           } 
         />
         <Route 
+          path="/student/login" 
+          element={
+            isAuthenticated && userType === 'student' ? 
+              <Navigate to="/student/dashboard" /> : 
+              <StudentLogin onLogin={handleStudentLogin} />
+          } 
+        />
+        <Route 
+          path="/student/register" 
+          element={<StudentRegistration />} 
+        />
+        <Route 
           path="/student/dashboard" 
           element={
             isAuthenticated && userType === 'student' ? 
@@ -85,6 +99,18 @@ function App() {
               <Navigate to="/teacher/dashboard" /> : 
               <TeacherLogin onLogin={handleTeacherLogin} />
           } 
+        />
+        <Route 
+          path="/teacher/login" 
+          element={
+            isAuthenticated && userType === 'teacher' ? 
+              <Navigate to="/teacher/dashboard" /> : 
+              <TeacherLogin onLogin={handleTeacherLogin} />
+          } 
+        />
+        <Route 
+          path="/teacher/register" 
+          element={<TeacherRegistration />} 
         />
         <Route 
           path="/teacher/dashboard" 

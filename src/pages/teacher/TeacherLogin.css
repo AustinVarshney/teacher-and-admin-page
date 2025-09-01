@@ -141,6 +141,31 @@
   margin: 5px 0;
 }
 
+.signup-section {
+  margin: 15px 0;
+  padding: 10px 0;
+  border-top: 1px solid #e1e5e9;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.signup-section p {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.signup-section span {
+  color: #667eea;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.signup-section span:hover {
+  color: #764ba2;
+  text-decoration: underline;
+}
+
 .admin-link a,
 .student-link a {
   color: #667eea;

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './StudentLogin.css';
 
 interface StudentLoginProps {
@@ -6,6 +7,7 @@ interface StudentLoginProps {
 }
 
 const StudentLogin: React.FC<StudentLoginProps> = ({ onLogin }) => {
+  const navigate = useNavigate();
   const [panNumber, setPanNumber] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -79,6 +81,9 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ onLogin }) => {
         <div className="student-login-footer">
           <p>Demo Credentials:</p>
           <p>PAN: PAN123456 | Password: student123</p>
+          <div className="signup-section">
+            <p>Don't have an account? <span onClick={() => navigate('/student/register')}>Sign up here</span></p>
+          </div>
           <p className="admin-link">
             <a href="/admin">Admin Login</a>
           </p>

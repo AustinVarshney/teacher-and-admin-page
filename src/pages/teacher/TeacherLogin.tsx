@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './TeacherLogin.css';
 
 interface TeacherLoginProps {
@@ -6,6 +7,7 @@ interface TeacherLoginProps {
 }
 
 const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLogin }) => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -98,6 +100,9 @@ const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLogin }) => {
         <div className="teacher-login-footer">
           <p>Demo Credentials:</p>
           <p>Email: teacher@slms.com | Password: teacher123</p>
+          <div className="signup-section">
+            <p>Don't have an account? <span onClick={() => navigate('/teacher/register')}>Sign up here</span></p>
+          </div>
           <p className="admin-link">
             <a href="/admin">Admin Login</a>
           </p>

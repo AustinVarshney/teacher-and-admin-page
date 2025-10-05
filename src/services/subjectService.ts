@@ -1,0 +1,117 @@
+import { api } from './api';
+
+// Interface definitions
+export interface SubjectData {
+  id?: number;
+  subjectName: string;
+  classId: number; // Required when creating
+  teacherId?: number; // Optional - can be assigned later
+  sessionId?: number;
+}
+
+export interface SubjectResponse {
+  id: number;
+  subjectName: string;
+  classId: number;
+  className?: string;
+  teacherId?: number;
+  teacherName?: string;
+  sessionId?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export class SubjectService {
+  // Create subject
+  static async createSubject(subjectData: SubjectData) {
+    try {
+      const response = await api.post('/subjects', subjectData);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to create subject');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to create subject';
+      throw new Error(message);
+    }
+  }
+
+  // Update subject
+  static async updateSubject(id: number, subjectData: SubjectData) {
+    try {
+      const response = await api.put(`/subjects/${id}`, subjectData);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to update subject');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to update subject';
+      throw new Error(message);
+    }
+  }
+
+  // Get subject by ID
+  static async getSubjectById(id: number) {
+    try {
+      const response = await api.get(`/subjects/${id}`);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to fetch subject');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch subject';
+      throw new Error(message);
+    }
+  }
+
+  // Get all subjects
+  static async getAllSubjects() {
+    try {
+      const response = await api.get('/subjects');
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data || [];
+      }
+      throw new Error(response.data.message || 'Failed to fetch subjects');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch subjects';
+      throw new Error(message);
+    }
+  }
+
+  // Get subjects by class
+  static async getSubjectsByClass(classId: number) {
+    try {
+      const response = await api.get(`/subjects/class/${classId}`);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data || [];
+      }
+      throw new Error(response.data.message || 'Failed to fetch subjects for class');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch subjects for class';
+      throw new Error(message);
+    }
+  }
+
+  // Delete subject
+  static async deleteSubject(subjectId: number, classId: number) {
+    try {
+      const response = await api.delete(`/subjects/subject/${subjectId}/class/${classId}`);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return true;
+      }
+      throw new Error(response.data.message || 'Failed to delete subject');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to delete subject';
+      throw new Error(message);
+    }
+  }
+
+}
+
+export default SubjectService;

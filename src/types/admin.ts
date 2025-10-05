@@ -3,6 +3,7 @@ export interface Student {
   name: string;
   section: string;
   classRollNumber: number;
+  status: 'ACTIVE' | 'INACTIVE' | 'GRADUATED';
   feeStatus: 'paid' | 'pending' | 'overdue';
   feeCatalogStatus: 'up_to_date' | 'pending' | 'overdue';
   currentClass: string;
@@ -23,7 +24,7 @@ export interface MonthlyFee {
   year: number;
   amount: number;
   dueDate: string;
-  status: 'paid' | 'pending' | 'overdue';
+  status: 'paid' | 'pending' | 'overdue' | 'unpaid';
   paymentDate?: string;
   receiptNumber?: string;
 }

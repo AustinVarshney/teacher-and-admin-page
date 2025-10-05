@@ -49,7 +49,8 @@ export interface TCApprovalRequest {
 }
 
 export interface AssignedClass {
-  id: string;
+  id: string; // Timetable entry ID
+  classId: string; // Actual class ID for fetching students
   className: string;
   section: string;
   subject: string;
@@ -123,6 +124,7 @@ export interface ClassStudent {
   mobileNumber: string;
   currentClass: string;
   section: string;
+  rollNumber?: number;
   feeStatus: 'paid' | 'pending' | 'overdue';
   attendance: {
     present: number;

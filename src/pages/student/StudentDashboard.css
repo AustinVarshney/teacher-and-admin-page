@@ -1325,3 +1325,34 @@
   visibility: visible;
   pointer-events: all;
 }
+
+/* Transfer Certificate Modal Animation */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Custom scrollbar for modal */
+.dashboard-container ::-webkit-scrollbar {
+  width: 10px;
+}
+
+.dashboard-container ::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.dashboard-container ::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.dashboard-container ::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

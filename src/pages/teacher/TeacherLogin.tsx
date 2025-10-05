@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import './TeacherLogin.css';
+import AuthService from '../../services/authService';
 
 interface TeacherLoginProps {
   onLogin: () => void;
 }
 
 const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLogin }) => {
-  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -23,15 +22,49 @@ const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLogin }) => {
     setError('');
     setIsLoading(true);
 
-    // Simulate login verification
-    setTimeout(() => {
-      if (email === 'teacher@slms.com' && password === 'teacher123') {
-        onLogin();
+    try {
+      // Call backend API to login teacher
+      const response = await AuthService.loginStaff({
+        email: email.trim(),
+        password
+      }, 'ROLE_TEACHER'); // Validate teacher role
+
+      // Store additional teacher information
+      localStorage.setItem('userEmail', email.trim());
+      localStorage.setItem('userType', 'teacher');
+      localStorage.setItem('userRole', 'ROLE_TEACHER');
+
+      // Calculate and store token expiration timestamps
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      const expirationTime = currentTimestamp + response.expiresIn;
+      localStorage.setItem('tokenIssuedAt', currentTimestamp.toString());
+      localStorage.setItem('tokenExpiresAt', expirationTime.toString());
+
+      // Call parent component's onLogin to redirect to dashboard
+      onLogin();
+    } catch (error: any) {
+      console.error('Teacher login error:', error);
+      
+      // Handle different error types
+      if (error.message) {
+        // Check if it's a role mismatch error
+        if (error.message.toLowerCase().includes('does not have') || 
+            error.message.toLowerCase().includes('privileges') ||
+            error.message.toLowerCase().includes('access denied')) {
+          setError('Access denied. Please use the Teacher Login Credentials.');
+        } else if (error.message.includes('401') || error.message.toLowerCase().includes('invalid credentials')) {
+          setError('Invalid email or password. Please try again.');
+        } else if (error.message.includes('Network Error') || error.message.toLowerCase().includes('network')) {
+          setError('Network error. Please check your connection and try again.');
+        } else {
+          setError(error.message);
+        }
       } else {
-        setError('Invalid email or password. Please try again.');
+        setError('Login failed. Please try again.');
       }
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleReset = () => {
@@ -61,6 +94,7 @@ const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLogin }) => {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email address"
               required
+              disabled={isLoading}
               className="teacher-input"
             />
           </div>
@@ -74,6 +108,7 @@ const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLogin }) => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
               required
+              disabled={isLoading}
               className="teacher-input"
             />
           </div>
@@ -98,10 +133,10 @@ const TeacherLogin: React.FC<TeacherLoginProps> = ({ onLogin }) => {
         </form>
         
         <div className="teacher-login-footer">
-          <p>Demo Credentials:</p>
-          <p>Email: teacher@slms.com | Password: teacher123</p>
+          <p>Teacher Credentials:</p>
+          <p>Use your registered email and password</p>
           <div className="signup-section">
-            <p>Don't have an account? <span onClick={() => navigate('/teacher/register')}>Sign up here</span></p>
+            <p className="info-text">📝 New teachers should contact the admin office for registration</p>
           </div>
           <p className="admin-link">
             <a href="/admin">Admin Login</a>

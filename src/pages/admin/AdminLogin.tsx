@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import AuthService from '../../services/authService';
 import './AdminLogin.css';
 
 interface AdminLoginProps {
@@ -16,15 +17,57 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
     setError('');
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      if (email === 'admin@slms.com' && password === 'admin123') {
-        onLogin();
+    try {
+      const response = await AuthService.loginStaff({
+        email: email.trim(),
+        password: password
+      }, 'ROLE_ADMIN'); // Validate admin role
+
+      console.log('Admin login successful:', response);
+
+      // Store authentication data
+      localStorage.setItem('authToken', response.accessToken);
+      localStorage.setItem('tokenType', response.tokenType);
+      localStorage.setItem('expiresIn', response.expiresIn.toString());
+      localStorage.setItem('userEmail', email);
+      localStorage.setItem('userType', 'admin');
+      localStorage.setItem('userRole', 'ROLE_ADMIN');
+
+      // Calculate and store token expiration timestamps
+      const issuedAt = Date.now();
+      const expiresAt = issuedAt + (response.expiresIn * 1000); // Convert seconds to milliseconds
+      localStorage.setItem('tokenIssuedAt', issuedAt.toString());
+      localStorage.setItem('tokenExpiresAt', expiresAt.toString());
+
+      // Call onLogin to update app state
+      onLogin();
+    } catch (error: any) {
+      console.error('Admin login failed:', error);
+      
+      // Handle specific error messages
+      if (error.message) {
+        // Check if it's a role mismatch error
+        if (error.message.toLowerCase().includes('does not have') || 
+            error.message.toLowerCase().includes('privileges') ||
+            error.message.toLowerCase().includes('access denied')) {
+          setError('Access denied. Please use the Admin Login Credentials.');
+        } else {
+          setError(error.message);
+        }
+      } else if (error.response?.data?.message) {
+        setError(error.response.data.message);
+      } else if (error.response?.status === 401) {
+        setError('Invalid email or password. Please try again.');
+      } else if (error.response?.status === 403) {
+        setError('Access denied. Please use the correct login page.');
+      } else if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
+        setError('Cannot connect to server. Please ensure the backend is running on port 8080.');
       } else {
-        setError('Invalid email or password');
+        setError('Login failed. Please check your credentials and try again.');
       }
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -49,6 +92,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
               placeholder="Enter your email"
               required
               className="admin-input"
+              disabled={isLoading}
             />
           </div>
 
@@ -62,6 +106,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
               placeholder="Enter your password"
               required
               className="admin-input"
+              disabled={isLoading}
             />
           </div>
 
@@ -77,8 +122,8 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
         </form>
 
         <div className="admin-login-footer">
-          <p>Demo Credentials:</p>
-          <p>Email: admin@slms.com | Password: admin123</p>
+          <p>Admin Credentials:</p>
+          <p>Use credentials from initial-setup.sql or slms.txt</p>
           <p className="student-link">
             <a href="/">Student Login</a>
           </p>

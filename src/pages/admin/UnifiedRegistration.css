@@ -1,0 +1,111 @@
+.unified-registration {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.registration-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.registration-header h2 {
+  margin: 0 0 0.5rem 0;
+  color: #1e293b;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.registration-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 1rem;
+}
+
+.registration-type-selector {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  margin-bottom: 2.5rem;
+  flex-wrap: wrap;
+}
+
+.type-btn {
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 180px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.type-btn:hover {
+  border-color: #667eea;
+  transform: translateY(-4px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.2);
+}
+
+.type-btn.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: #667eea;
+  color: white;
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  transform: translateY(-2px);
+}
+
+.type-icon {
+  font-size: 2.5rem;
+  transition: transform 0.3s ease;
+}
+
+.type-btn:hover .type-icon {
+  transform: scale(1.1);
+}
+
+.type-label {
+  font-weight: 600;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.type-btn.active .type-label {
+  color: white;
+}
+
+.registration-form-container {
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .registration-type-selector {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .type-btn {
+    min-width: 100%;
+  }
+
+  .unified-registration {
+    padding: 1.5rem;
+  }
+}

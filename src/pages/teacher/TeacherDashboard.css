@@ -4,6 +4,13 @@
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+/* Enhanced hover effects for teacher profile cards */
+.teacher-profile .info-item:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.25) !important;
+  cursor: default;
+}
+
 /* Navbar Styles */
 .teacher-navbar {
   background: white;

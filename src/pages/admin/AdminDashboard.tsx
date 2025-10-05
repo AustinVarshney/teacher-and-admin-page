@@ -11,6 +11,7 @@ import { FeeService } from '../../services/feeService';
 import AdminService, { StudentResponse, TeacherResponse, NonTeachingStaffResponse, ClassInfoResponse } from '../../services/adminService';
 import StudentService from '../../services/studentService';
 import TransferCertificateService from '../../services/transferCertificateService';
+import NotificationService, { BroadcastMessageDto } from '../../services/notificationService';
 import TeacherAssignment from './TeacherAssignment.tsx';
 import { 
   Student, 
@@ -59,6 +60,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [modalAction, setModalAction] = useState<'APPROVED' | 'REJECTED' | null>(null);
   const [adminReply, setAdminReply] = useState('');
   const [processing, setProcessing] = useState(false);
+
+  // Broadcast/Inbox state
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcastPriority, setBroadcastPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM');
+  const [selectedRecipientType, setSelectedRecipientType] = useState<'STUDENT' | 'TEACHER' | 'BOTH'>('STUDENT');
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [selectedTeachers, setSelectedTeachers] = useState<string[]>([]);
+  const [selectAllStudents, setSelectAllStudents] = useState(false);
+  const [selectAllTeachers, setSelectAllTeachers] = useState(false);
+  const [broadcasting, setBroadcasting] = useState(false);
+  const [broadcastSuccess, setBroadcastSuccess] = useState('');
+  const [broadcastError, setBroadcastError] = useState('');
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+  const [teacherSearchTerm, setTeacherSearchTerm] = useState('');
 
   // Save active tab to localStorage whenever it changes
   useEffect(() => {
@@ -1005,27 +1021,531 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     );
   };
 
-  const renderInbox = () => (
-    <div className="inbox-section">
-      <h3>Inbox</h3>
-      <div className="messages-list">
-        {mockMessages.map((message) => (
-          <div key={message.id} className={`message-item ${!message.isRead ? 'unread' : ''}`}>
-            <div className="message-sender">{message.from}</div>
-            <div className="message-content">
-              <h4>{message.subject}</h4>
-              <p>{message.content}</p>
-              <span className="message-time">{message.timestamp}</span>
-            </div>
-            <div className="message-actions">
-              <button className="action-btn">Reply</button>
-              <button className="action-btn">Mark Read</button>
+  const renderInbox = () => {
+    // Filter students based on search term
+    const filteredStudents = students.filter(student => {
+      const searchLower = studentSearchTerm.toLowerCase();
+      return (
+        student.name.toLowerCase().includes(searchLower) ||
+        student.panNumber.toLowerCase().includes(searchLower) ||
+        student.className?.toLowerCase().includes(searchLower)
+      );
+    });
+
+    // Filter teachers based on search term
+    const filteredTeachers = teachers.filter(teacher => {
+      const searchLower = teacherSearchTerm.toLowerCase();
+      return (
+        teacher.name.toLowerCase().includes(searchLower) ||
+        teacher.email.toLowerCase().includes(searchLower) ||
+        teacher.designation?.toLowerCase().includes(searchLower)
+      );
+    });
+
+    // Handle select all students
+    const handleSelectAllStudents = (checked: boolean) => {
+      setSelectAllStudents(checked);
+      if (checked) {
+        setSelectedStudents(filteredStudents.map(s => s.panNumber));
+      } else {
+        setSelectedStudents([]);
+      }
+    };
+
+    // Handle select all teachers
+    const handleSelectAllTeachers = (checked: boolean) => {
+      setSelectAllTeachers(checked);
+      if (checked) {
+        setSelectedTeachers(filteredTeachers.map(t => t.email));
+      } else {
+        setSelectedTeachers([]);
+      }
+    };
+
+    // Handle individual student selection
+    const handleStudentToggle = (panNumber: string) => {
+      setSelectedStudents(prev => {
+        if (prev.includes(panNumber)) {
+          return prev.filter(p => p !== panNumber);
+        } else {
+          return [...prev, panNumber];
+        }
+      });
+    };
+
+    // Handle individual teacher selection
+    const handleTeacherToggle = (email: string) => {
+      setSelectedTeachers(prev => {
+        if (prev.includes(email)) {
+          return prev.filter(e => e !== email);
+        } else {
+          return [...prev, email];
+        }
+      });
+    };
+
+    // Handle broadcast message
+    const handleBroadcast = async () => {
+      try {
+        setBroadcasting(true);
+        setBroadcastError('');
+        setBroadcastSuccess('');
+
+        // Validation
+        if (!broadcastTitle.trim()) {
+          setBroadcastError('Please enter a message title');
+          return;
+        }
+
+        if (!broadcastMessage.trim()) {
+          setBroadcastError('Please enter a message');
+          return;
+        }
+
+        // Collect recipients based on selection
+        let recipientIds: string[] = [];
+        
+        if (selectedRecipientType === 'STUDENT' || selectedRecipientType === 'BOTH') {
+          if (selectedStudents.length === 0) {
+            setBroadcastError('Please select at least one student');
+            return;
+          }
+          recipientIds = [...recipientIds, ...selectedStudents];
+        }
+
+        if (selectedRecipientType === 'TEACHER' || selectedRecipientType === 'BOTH') {
+          if (selectedTeachers.length === 0 && selectedRecipientType === 'TEACHER') {
+            setBroadcastError('Please select at least one teacher');
+            return;
+          }
+          recipientIds = [...recipientIds, ...selectedTeachers];
+        }
+
+        if (recipientIds.length === 0) {
+          setBroadcastError('Please select at least one recipient');
+          return;
+        }
+
+        // Send broadcast for students
+        if (selectedRecipientType === 'STUDENT' || selectedRecipientType === 'BOTH') {
+          const studentBroadcast: BroadcastMessageDto = {
+            title: broadcastTitle,
+            message: broadcastMessage,
+            recipientIds: selectedStudents,
+            recipientType: 'STUDENT',
+            priority: broadcastPriority
+          };
+          await NotificationService.broadcastMessage(studentBroadcast);
+        }
+
+        // Send broadcast for teachers
+        if (selectedRecipientType === 'TEACHER' || selectedRecipientType === 'BOTH') {
+          const teacherBroadcast: BroadcastMessageDto = {
+            title: broadcastTitle,
+            message: broadcastMessage,
+            recipientIds: selectedTeachers,
+            recipientType: 'TEACHER',
+            priority: broadcastPriority
+          };
+          await NotificationService.broadcastMessage(teacherBroadcast);
+        }
+
+        setBroadcastSuccess(`Message sent successfully to ${recipientIds.length} recipient(s)!`);
+        
+        // Reset form
+        setBroadcastTitle('');
+        setBroadcastMessage('');
+        setSelectedStudents([]);
+        setSelectedTeachers([]);
+        setSelectAllStudents(false);
+        setSelectAllTeachers(false);
+        
+        // Clear success message after 5 seconds
+        setTimeout(() => setBroadcastSuccess(''), 5000);
+
+      } catch (err: any) {
+        console.error('Broadcast error:', err);
+        setBroadcastError(err.message || 'Failed to send broadcast message');
+      } finally {
+        setBroadcasting(false);
+      }
+    };
+
+    return (
+      <div className="inbox-section">
+        <h3 style={{ marginBottom: '1.5rem', fontSize: '1.75rem' }}>📧 Broadcast Message</h3>
+        
+        {/* Success/Error Messages */}
+        {broadcastSuccess && (
+          <div style={{
+            padding: '1rem',
+            marginBottom: '1rem',
+            backgroundColor: '#10b981',
+            color: 'white',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <span>✓</span>
+            <span>{broadcastSuccess}</span>
+          </div>
+        )}
+
+        {broadcastError && (
+          <div style={{
+            padding: '1rem',
+            marginBottom: '1rem',
+            backgroundColor: '#ef4444',
+            color: 'white',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <span>⚠️</span>
+            <span>{broadcastError}</span>
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gap: '1.5rem' }}>
+          {/* Message Compose Section */}
+          <div style={{
+            background: 'white',
+            padding: '1.5rem',
+            borderRadius: '12px',
+            border: '1px solid #e5e7eb',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+          }}>
+            <h4 style={{ marginBottom: '1rem', fontSize: '1.1rem', color: '#1f2937' }}>Compose Message</h4>
+            
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              {/* Title Input */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', fontSize: '0.9rem' }}>
+                  Message Title *
+                </label>
+                <input
+                  type="text"
+                  value={broadcastTitle}
+                  onChange={(e) => setBroadcastTitle(e.target.value)}
+                  placeholder="Enter message title..."
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+
+              {/* Priority Selection */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', fontSize: '0.9rem' }}>
+                  Priority Level
+                </label>
+                <select
+                  value={broadcastPriority}
+                  onChange={(e) => setBroadcastPriority(e.target.value as 'LOW' | 'MEDIUM' | 'HIGH')}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '1rem'
+                  }}
+                >
+                  <option value="LOW">🟢 Low Priority</option>
+                  <option value="MEDIUM">🟡 Medium Priority</option>
+                  <option value="HIGH">🔴 High Priority</option>
+                </select>
+              </div>
+
+              {/* Message Textarea */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', fontSize: '0.9rem' }}>
+                  Message Content *
+                </label>
+                <textarea
+                  value={broadcastMessage}
+                  onChange={(e) => setBroadcastMessage(e.target.value)}
+                  placeholder="Type your message here..."
+                  rows={6}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
             </div>
           </div>
-        ))}
+
+          {/* Recipient Selection Section */}
+          <div style={{
+            background: 'white',
+            padding: '1.5rem',
+            borderRadius: '12px',
+            border: '1px solid #e5e7eb',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+          }}>
+            <h4 style={{ marginBottom: '1rem', fontSize: '1.1rem', color: '#1f2937' }}>Select Recipients</h4>
+            
+            {/* Recipient Type Tabs */}
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+              <button
+                onClick={() => setSelectedRecipientType('STUDENT')}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  background: selectedRecipientType === 'STUDENT' ? '#3b82f6' : '#f3f4f6',
+                  color: selectedRecipientType === 'STUDENT' ? 'white' : '#4b5563',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                👨‍🎓 Students Only
+              </button>
+              <button
+                onClick={() => setSelectedRecipientType('TEACHER')}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  background: selectedRecipientType === 'TEACHER' ? '#3b82f6' : '#f3f4f6',
+                  color: selectedRecipientType === 'TEACHER' ? 'white' : '#4b5563',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                👨‍🏫 Teachers Only
+              </button>
+              <button
+                onClick={() => setSelectedRecipientType('BOTH')}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  background: selectedRecipientType === 'BOTH' ? '#3b82f6' : '#f3f4f6',
+                  color: selectedRecipientType === 'BOTH' ? 'white' : '#4b5563',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                👥 Both
+              </button>
+            </div>
+
+            {/* Students List */}
+            {(selectedRecipientType === 'STUDENT' || selectedRecipientType === 'BOTH') && (
+              <div style={{ marginBottom: selectedRecipientType === 'BOTH' ? '1.5rem' : '0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h5 style={{ margin: 0, fontSize: '1rem', color: '#374151' }}>
+                    Students ({selectedStudents.length} selected{studentSearchTerm ? ` • ${filteredStudents.length} found` : ''})
+                  </h5>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectAllStudents}
+                      onChange={(e) => handleSelectAllStudents(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Select All</span>
+                  </label>
+                </div>
+                
+                {/* Student Search Input */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <input
+                    type="text"
+                    placeholder="🔍 Search by name, PAN, or class..."
+                    value={studentSearchTerm}
+                    onChange={(e) => setStudentSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '0.95rem',
+                      outline: 'none',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
+                    onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
+                  />
+                </div>
+                
+                <div style={{
+                  maxHeight: '300px',
+                  overflowY: 'auto',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  padding: '0.5rem'
+                }}>
+                  {filteredStudents.length === 0 ? (
+                    <p style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>
+                      {studentSearchTerm ? 'No students found matching your search' : 'No students available'}
+                    </p>
+                  ) : (
+                    filteredStudents.map(student => (
+                      <label
+                        key={student.panNumber}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          padding: '0.75rem',
+                          cursor: 'pointer',
+                          borderRadius: '6px',
+                          transition: 'background 0.2s',
+                          background: selectedStudents.includes(student.panNumber) ? '#eff6ff' : 'transparent'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = selectedStudents.includes(student.panNumber) ? '#eff6ff' : 'transparent'}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedStudents.includes(student.panNumber)}
+                          onChange={() => handleStudentToggle(student.panNumber)}
+                          style={{ cursor: 'pointer' }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: '500', fontSize: '0.95rem' }}>{student.name}</div>
+                          <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                            {student.className} • {student.panNumber}
+                          </div>
+                        </div>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Teachers List */}
+            {(selectedRecipientType === 'TEACHER' || selectedRecipientType === 'BOTH') && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h5 style={{ margin: 0, fontSize: '1rem', color: '#374151' }}>
+                    Teachers ({selectedTeachers.length} selected{teacherSearchTerm ? ` • ${filteredTeachers.length} found` : ''})
+                  </h5>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectAllTeachers}
+                      onChange={(e) => handleSelectAllTeachers(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Select All</span>
+                  </label>
+                </div>
+                
+                {/* Teacher Search Input */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <input
+                    type="text"
+                    placeholder="🔍 Search by name, email, or designation..."
+                    value={teacherSearchTerm}
+                    onChange={(e) => setTeacherSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '0.95rem',
+                      outline: 'none',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
+                    onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
+                  />
+                </div>
+                
+                <div style={{
+                  maxHeight: '300px',
+                  overflowY: 'auto',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  padding: '0.5rem'
+                }}>
+                  {filteredTeachers.length === 0 ? (
+                    <p style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>
+                      {teacherSearchTerm ? 'No teachers found matching your search' : 'No teachers available'}
+                    </p>
+                  ) : (
+                    filteredTeachers.map(teacher => (
+                      <label
+                        key={teacher.email}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          padding: '0.75rem',
+                          cursor: 'pointer',
+                          borderRadius: '6px',
+                          transition: 'background 0.2s',
+                          background: selectedTeachers.includes(teacher.email) ? '#eff6ff' : 'transparent'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = selectedTeachers.includes(teacher.email) ? '#eff6ff' : 'transparent'}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedTeachers.includes(teacher.email)}
+                          onChange={() => handleTeacherToggle(teacher.email)}
+                          style={{ cursor: 'pointer' }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: '500', fontSize: '0.95rem' }}>{teacher.name}</div>
+                          <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                            {teacher.designation} • {teacher.email}
+                          </div>
+                        </div>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Send Button */}
+          <button
+            onClick={handleBroadcast}
+            disabled={broadcasting}
+            style={{
+              padding: '1rem',
+              background: broadcasting ? '#9ca3af' : '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '1.1rem',
+              fontWeight: '600',
+              cursor: broadcasting ? 'not-allowed' : 'pointer',
+              transition: 'background 0.2s',
+              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+            }}
+            onMouseEnter={(e) => !broadcasting && (e.currentTarget.style.background = '#2563eb')}
+            onMouseLeave={(e) => !broadcasting && (e.currentTarget.style.background = '#3b82f6')}
+          >
+            {broadcasting ? '📤 Sending...' : '📤 Send Broadcast Message'}
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderSessions = () => (
     <SessionManagement 

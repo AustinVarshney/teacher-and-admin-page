@@ -8,12 +8,12 @@ import {
   LeaveRequest, 
   StudentResult,
   ClassStudent,
-  Notification,
   TCApprovalRequest
 } from '../../types/teacher';
 import TeacherService from '../../services/teacherService';
 import LeaveService from '../../services/leaveService';
 import MarkAttendance from './MarkAttendance';
+import NotificationService, { NotificationDto } from '../../services/notificationService';
 
 interface TeacherDashboardProps {
   onLogout: () => void;
@@ -37,6 +37,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
   const [studentCounts, setStudentCounts] = useState<{[classId: string]: number}>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<NotificationDto[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Mock data for features not yet connected (will be connected in next iteration)
   const mockStudentQueries: StudentQuery[] = [
@@ -49,58 +51,44 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
     { id: '2', title: 'Quadratic Equations', className: '10th', section: 'A', subject: 'Mathematics', description: 'Solving quadratic equations using different methods', videoUrl: '#', thumbnailUrl: '📹', uploadDate: '2024-01-08', duration: '50:00', views: 38 },
   ];
 
-  const mockNotifications: Notification[] = [
-    {
-      id: '1',
-      type: 'tc_approval',
-      title: 'TC Approval Required',
-      message: 'Admin has requested your approval for Rahul Kumar\'s transfer certificate',
-      timestamp: '2024-01-15 14:30',
-      isRead: false,
-      priority: 'high',
-      relatedData: {
-        studentId: '1',
-        studentName: 'Rahul Kumar',
-        tcRequestId: 'tc001'
-      }
-    },
-    {
-      id: '2',
-      type: 'admin_message',
-      title: 'Monthly Report Due',
-      message: 'Please submit your monthly class performance report by end of week',
-      timestamp: '2024-01-15 10:15',
-      isRead: false,
-      priority: 'medium',
-      relatedData: {
-        adminId: 'admin1',
-        adminName: 'Principal'
-      }
-    },
-    {
-      id: '3',
-      type: 'system_update',
-      title: 'System Maintenance',
-      message: 'SLMS will be under maintenance on Sunday from 2-4 AM',
-      timestamp: '2024-01-14 16:45',
-      isRead: true,
-      priority: 'low'
-    },
-    {
-      id: '4',
-      type: 'tc_approval',
-      title: 'TC Approval Required',
-      message: 'Admin has requested your approval for Priya Sharma\'s transfer certificate',
-      timestamp: '2024-01-14 11:20',
-      isRead: false,
-      priority: 'high',
-      relatedData: {
-        studentId: '2',
-        studentName: 'Priya Sharma',
-        tcRequestId: 'tc002'
-      }
+  // Fetch notifications from API
+  const fetchNotifications = async () => {
+    try {
+      const data = await NotificationService.getMyNotifications();
+      setNotifications(data);
+      const count = await NotificationService.getUnreadCount();
+      setUnreadCount(count);
+    } catch (err: any) {
+      console.error('Error fetching notifications:', err);
     }
-  ];
+  };
+
+  // Fetch notifications on mount and set up polling
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000); // Poll every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  // Mark notification as read
+  const markNotificationAsRead = async (notificationId: number) => {
+    try {
+      await NotificationService.markAsRead(notificationId);
+      await fetchNotifications(); // Refresh notifications
+    } catch (err: any) {
+      console.error('Error marking notification as read:', err);
+    }
+  };
+
+  // Mark all notifications as read
+  const markAllAsRead = async () => {
+    try {
+      await NotificationService.markAllAsRead();
+      await fetchNotifications(); // Refresh notifications
+    } catch (err: any) {
+      console.error('Error marking all as read:', err);
+    }
+  };
 
   const mockTCApprovalRequests: TCApprovalRequest[] = [
     {
@@ -376,20 +364,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
     }
   };
 
-  const handleNotificationClick = (notification: Notification) => {
-    if (notification.type === 'tc_approval') {
-      const tcRequest = mockTCApprovalRequests.find(req => req.id === notification.relatedData?.tcRequestId);
-      if (tcRequest) {
-        setSelectedTCRequest(tcRequest);
-        setShowTCModal(true);
-      }
-    }
-    
-    // Mark notification as read
-    notification.isRead = true;
-    setShowNotifications(false);
-  };
-
   const handleTCResponse = (tcId: string, response: 'approved' | 'rejected', remarks: string) => {
     const tcRequest = mockTCApprovalRequests.find(req => req.id === tcId);
     if (tcRequest) {
@@ -401,44 +375,92 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
     setSelectedTCRequest(null);
   };
 
-  const unreadNotificationsCount = mockNotifications.filter(n => !n.isRead).length;
-
   const renderNotifications = () => (
     <div className={`notifications-panel ${showNotifications ? 'show' : ''}`}>
       <div className="notifications-header">
-        <h3>Notifications ({unreadNotificationsCount} unread)</h3>
-        <button 
-          className="close-notifications"
-          onClick={() => setShowNotifications(false)}
-        >
-          ×
-        </button>
+        <h3>Notifications ({unreadCount} unread)</h3>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {unreadCount > 0 && (
+            <button 
+              className="mark-all-read-btn"
+              onClick={markAllAsRead}
+              style={{
+                padding: '0.5rem 1rem',
+                background: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.85rem'
+              }}
+            >
+              Mark All Read
+            </button>
+          )}
+          <button 
+            className="close-notifications"
+            onClick={() => setShowNotifications(false)}
+          >
+            ×
+          </button>
+        </div>
       </div>
       <div className="notifications-list">
-        {mockNotifications.map((notification) => (
-          <div 
-            key={notification.id} 
-            className={`notification-item ${notification.isRead ? 'read' : 'unread'} ${notification.priority}`}
-            onClick={() => handleNotificationClick(notification)}
-          >
-            <div className="notification-icon">
-              {notification.type === 'tc_approval' && '📋'}
-              {notification.type === 'admin_message' && '👨‍💼'}
-              {notification.type === 'system_update' && '🔧'}
-              {notification.type === 'student_query' && '❓'}
-            </div>
-            <div className="notification-content">
-              <h4>{notification.title}</h4>
-              <p>{notification.message}</p>
-              <span className="notification-time">{notification.timestamp}</span>
-            </div>
-            <div className="notification-priority">
-              <span className={`priority-badge ${notification.priority}`}>
-                {notification.priority}
-              </span>
-            </div>
+        {notifications.length === 0 ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+            <span style={{ fontSize: '3rem' }}>📭</span>
+            <p style={{ marginTop: '1rem' }}>No notifications yet</p>
           </div>
-        ))}
+        ) : (
+          notifications.map((notification) => (
+            <div 
+              key={notification.id} 
+              className={`notification-item ${notification.isRead ? 'read' : 'unread'}`}
+              onClick={() => !notification.isRead && notification.id && markNotificationAsRead(notification.id)}
+              style={{
+                cursor: notification.isRead ? 'default' : 'pointer',
+                background: notification.isRead ? '#f9fafb' : 'white',
+                borderLeft: `4px solid ${
+                  notification.priority === 'HIGH' ? '#ef4444' :
+                  notification.priority === 'MEDIUM' ? '#f59e0b' : '#10b981'
+                }`
+              }}
+            >
+              <div className="notification-icon">
+                {notification.priority === 'HIGH' && '🔴'}
+                {notification.priority === 'MEDIUM' && '🟡'}
+                {notification.priority === 'LOW' && '🟢'}
+              </div>
+              <div className="notification-content">
+                <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.25rem' }}>
+                  {notification.title}
+                </h4>
+                <p style={{ fontSize: '0.9rem', color: '#4b5563', marginBottom: '0.5rem' }}>
+                  {notification.message}
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="notification-time" style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+                    {notification.createdAt ? new Date(notification.createdAt).toLocaleString() : 'N/A'}
+                  </span>
+                  {notification.senderName && (
+                    <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                      From: {notification.senderName}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {!notification.isRead && (
+                <div style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: '#3b82f6',
+                  marginLeft: '1rem'
+                }} />
+              )}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
@@ -1292,8 +1314,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
             onClick={() => setShowNotifications(!showNotifications)}
           >
             🔔
-            {unreadNotificationsCount > 0 && (
-              <span className="notification-badge">{unreadNotificationsCount}</span>
+            {unreadCount > 0 && (
+              <span className="notification-badge">{unreadCount}</span>
             )}
           </button>
           <button className="nav-btn">👤</button>

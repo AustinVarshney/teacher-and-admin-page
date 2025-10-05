@@ -4,11 +4,11 @@ import './TCForm.css';
 import StudentService from '../../services/studentService';
 import EventService from '../../services/eventService';
 import TimetableService from '../../services/timetableService';
-import TeacherService from '../../services/teacherService';
 import { FeeService } from '../../services/feeService';
 import { AttendanceService } from '../../services/attendanceService';
 import TransferCertificateService from '../../services/transferCertificateService';
 import { TransferCertificateRequest, TCRequest } from '../../types';
+import NotificationService, { NotificationDto } from '../../services/notificationService';
 
 interface StudentDashboardProps {
   onLogout: () => void;
@@ -18,7 +18,6 @@ type AttendanceSummary = { present: number; absent: number; };
 type Holiday = { id: string; date: string; name: string; };
 type TimetableEntry = { id: string; day: string; period: number; start: string; end: string; subject: string; teacher: string; };
 type EventItem = { id: string; startDate: string; endDate: string; name: string; description?: string; type: 'sports' | 'cultural' | 'academic' | 'meeting'; };
-type NotificationItem = { id: string; title: string; message: string; date: string; };
 type FeeStatus = { total: number; paid: number; pending: number; status: 'paid' | 'pending' | 'overdue'; };
 type EnquiryContact = { id: string; subject: string; teacher: string; phone: string; };
 type VideoLecture = { id: string; title: string; subject: string; className: string; url: string; };
@@ -44,6 +43,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
   const [enquiryContacts, setEnquiryContacts] = useState<EnquiryContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<NotificationDto[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Transfer Certificate state
   const [tcRequests, setTcRequests] = useState<TransferCertificateRequest[]>([]);
@@ -340,12 +341,44 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
   //   { id: 'e2', date: '2025-03-05', name: 'Cultural Fest', type: 'cultural' },
   // ];
 
-  const notifications: NotificationItem[] = [
-    { id: 'n1', title: 'Fee Reminder', message: 'Please pay term 2 fees before 25th.', date: '2025-01-15' },
-    { id: 'n2', title: 'PTM', message: 'Parent-Teacher Meeting on 20th Jan.', date: '2025-01-12' },
-  ];
+  // Fetch notifications from API
+  const fetchNotifications = async () => {
+    try {
+      const data = await NotificationService.getMyNotifications();
+      setNotifications(data);
+      const count = await NotificationService.getUnreadCount();
+      setUnreadCount(count);
+    } catch (err: any) {
+      console.error('Error fetching notifications:', err);
+    }
+  };
 
-  const unreadNotificationsCount = notifications.length;
+  // Fetch notifications on mount and set up polling
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000); // Poll every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  // Mark notification as read
+  const markNotificationAsRead = async (notificationId: number) => {
+    try {
+      await NotificationService.markAsRead(notificationId);
+      await fetchNotifications(); // Refresh notifications
+    } catch (err: any) {
+      console.error('Error marking notification as read:', err);
+    }
+  };
+
+  // Mark all notifications as read
+  const markAllAsRead = async () => {
+    try {
+      await NotificationService.markAllAsRead();
+      await fetchNotifications(); // Refresh notifications
+    } catch (err: any) {
+      console.error('Error marking all as read:', err);
+    }
+  };
 
   // Mock fee status (COMMENTED OUT - Now using API data from feeData)
   // const feeStatus: FeeStatus = { total: 60000, paid: 55000, pending: 5000, status: 'pending' };
@@ -545,26 +578,93 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 aria-label="Notifications"
               >
                 <span className="notification-icon">🔔</span>
-                {unreadNotificationsCount > 0 && (
-                  <span className="notification-badge">{unreadNotificationsCount}</span>
+                {unreadCount > 0 && (
+                  <span className="notification-badge">{unreadCount}</span>
                 )}
               </button>
               {showNotifications && (
                 <div className="notifications-dropdown">
                   <div className="notifications-header">
-                    <h3>Notifications</h3>
-                    <button className="close-notifications" onClick={() => setShowNotifications(false)}>×</button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                      <h3>Notifications ({unreadCount} unread)</h3>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {unreadCount > 0 && (
+                          <button 
+                            onClick={markAllAsRead}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              background: '#10b981',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem'
+                            }}
+                          >
+                            Mark All Read
+                          </button>
+                        )}
+                        <button className="close-notifications" onClick={() => setShowNotifications(false)}>×</button>
+                      </div>
+                    </div>
                   </div>
                   <div className="notifications-list">
-                    {notifications.length === 0 && (
-                      <div className="no-notifications">No notifications</div>
-                    )}
-                    {notifications.map(n => (
-                      <div key={n.id} className="notification-item">
-                        <div className="notification-date">{n.date}</div>
-                        <div className="notification-message"><strong>{n.title}:</strong> {n.message}</div>
+                    {notifications.length === 0 ? (
+                      <div className="no-notifications" style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                        <span style={{ fontSize: '3rem' }}>📭</span>
+                        <p style={{ marginTop: '1rem' }}>No notifications yet</p>
                       </div>
-                    ))}
+                    ) : (
+                      notifications.map(notification => (
+                        <div 
+                          key={notification.id} 
+                          className="notification-item"
+                          onClick={() => !notification.isRead && notification.id && markNotificationAsRead(notification.id)}
+                          style={{
+                            cursor: notification.isRead ? 'default' : 'pointer',
+                            background: notification.isRead ? '#f9fafb' : 'white',
+                            borderLeft: `4px solid ${
+                              notification.priority === 'HIGH' ? '#ef4444' :
+                              notification.priority === 'MEDIUM' ? '#f59e0b' : '#10b981'
+                            }`,
+                            padding: '1rem',
+                            marginBottom: '0.5rem',
+                            position: 'relative'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'start', gap: '0.75rem' }}>
+                            <div style={{ fontSize: '1.5rem' }}>
+                              {notification.priority === 'HIGH' && '🔴'}
+                              {notification.priority === 'MEDIUM' && '🟡'}
+                              {notification.priority === 'LOW' && '🟢'}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: '600', fontSize: '0.95rem', marginBottom: '0.25rem' }}>
+                                {notification.title}
+                              </div>
+                              <div style={{ fontSize: '0.9rem', color: '#4b5563', marginBottom: '0.5rem' }}>
+                                {notification.message}
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#9ca3af' }}>
+                                <span>{notification.createdAt ? new Date(notification.createdAt).toLocaleString() : 'N/A'}</span>
+                                {notification.senderName && (
+                                  <span style={{ color: '#6b7280' }}>From: {notification.senderName}</span>
+                                )}
+                              </div>
+                            </div>
+                            {!notification.isRead && (
+                              <div style={{
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                background: '#3b82f6',
+                                flexShrink: 0
+                              }} />
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               )}

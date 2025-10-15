@@ -5,6 +5,7 @@ export interface ClassData {
   className: string;
   feeAmount: number;
   sessionId: number;
+  classTeacherId: number;  // Required field for class teacher
 }
 
 // Backend response interface (matches Java DTO)
@@ -29,6 +30,8 @@ export interface ClassResponse {
   studentCount: number;  // Frontend uses 'studentCount'
   sessionId: number;
   sessionName: string;
+  classTeacherId?: number;
+  classTeacherName?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -41,7 +44,9 @@ const mapBackendToFrontend = (backendClass: BackendClassResponse): ClassResponse
     feeAmount: backendClass.feesAmount || 0,  // Map feesAmount -> feeAmount
     studentCount: backendClass.totalStudents || 0,  // Map totalStudents -> studentCount
     sessionId: backendClass.sessionId,
-    sessionName: backendClass.sessionName
+    sessionName: backendClass.sessionName,
+    classTeacherId: backendClass.classTeacherId,
+    classTeacherName: backendClass.classTeacherName
   };
 };
 
@@ -91,7 +96,8 @@ export class ClassService {
       const backendData = {
         className: classData.className,
         feesAmount: classData.feeAmount,  // Map feeAmount -> feesAmount
-        sessionId: classData.sessionId
+        sessionId: classData.sessionId,
+        classTeacherId: classData.classTeacherId  // Required field
       };
       
       const response = await api.post('/classes', backendData);
@@ -114,7 +120,8 @@ export class ClassService {
       const backendData = {
         className: classData.className,
         feesAmount: classData.feeAmount,  // Map feeAmount -> feesAmount
-        sessionId: sessionId  // Use the provided sessionId
+        sessionId: sessionId,  // Use the provided sessionId
+        classTeacherId: classData.classTeacherId  // Required field
       };
       
       // Backend uses PATCH /classes/{id} with sessionId in body
@@ -203,10 +210,17 @@ export class ClassService {
 
       const createdClasses: ClassResponse[] = [];
       for (const sourceClass of sourceClasses) {
+        // Ensure classTeacherId is provided when copying
+        if (!sourceClass.classTeacherId) {
+          console.warn(`Skipping class ${sourceClass.className} - no class teacher assigned`);
+          continue;
+        }
+        
         const newClass = await this.createClass({
           className: sourceClass.className,
           feeAmount: sourceClass.feeAmount,
-          sessionId: targetSessionId
+          sessionId: targetSessionId,
+          classTeacherId: sourceClass.classTeacherId
         });
         createdClasses.push(newClass);
       }
@@ -220,7 +234,7 @@ export class ClassService {
   /**
    * Validate class data
    */
-  static validateClassData(className: string, feeAmount: number, sessionId: number): string | null {
+  static validateClassData(className: string, feeAmount: number, sessionId: number, classTeacherId: number): string | null {
     if (!className || className.trim().length === 0) {
       return 'Class name is required';
     }
@@ -235,6 +249,9 @@ export class ClassService {
     }
     if (!sessionId) {
       return 'Session is required';
+    }
+    if (!classTeacherId) {
+      return 'Class teacher is required';
     }
     return null;
   }

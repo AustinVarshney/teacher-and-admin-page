@@ -12,7 +12,10 @@ import AdminService, { StudentResponse, TeacherResponse, NonTeachingStaffRespons
 import StudentService from '../../services/studentService';
 import TransferCertificateService from '../../services/transferCertificateService';
 import NotificationService, { BroadcastMessageDto } from '../../services/notificationService';
+import LeaveService, { StaffLeaveResponse } from '../../services/leaveService';
+import QueryService, { TeacherQueryResponse } from '../../services/queryService';
 import TeacherAssignment from './TeacherAssignment.tsx';
+import galleryService from '../../services/galleryService';
 import { 
   Student, 
   Message,
@@ -76,6 +79,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
   const [teacherSearchTerm, setTeacherSearchTerm] = useState('');
 
+  // Teacher Query and Leave Management state
+  const [teacherQueries, setTeacherQueries] = useState<TeacherQueryResponse[]>([]);
+  const [staffLeaves, setStaffLeaves] = useState<StaffLeaveResponse[]>([]);
+  const [queryResponseText, setQueryResponseText] = useState<{[key: number]: string}>({});
+  const [leaveResponseText, setLeaveResponseText] = useState<{[key: number]: string}>({});
+
+  // Gallery state
+  const [galleryImages, setGalleryImages] = useState<any[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imageTitle, setImageTitle] = useState('');
+  const [imageDescription, setImageDescription] = useState('');
+  const [showGalleryUpload, setShowGalleryUpload] = useState(false);
+
   // Save active tab to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('adminActiveTab', activeTab);
@@ -88,12 +105,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   // Fetch all data on component mount
   useEffect(() => {
     fetchAllData();
+    fetchGalleryImages();
   }, []);
   
   // Load TC requests when switching to TC tab
   useEffect(() => {
     if (activeTab === 'tc-requests') {
       loadTCRequests();
+    }
+  }, [activeTab]);
+
+  // Load teacher queries and staff leaves
+  useEffect(() => {
+    if (activeTab === 'teacher-queries') {
+      loadTeacherQueries();
+    } else if (activeTab === 'staff-leaves') {
+      loadStaffLeaves();
     }
   }, [activeTab]);
   
@@ -1547,6 +1574,385 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     );
   };
 
+  // Load teacher queries from admin
+  const loadTeacherQueries = async () => {
+    try {
+      const queries = await QueryService.getTeacherQueriesForAdmin();
+      setTeacherQueries(queries);
+    } catch (err) {
+      console.error('Error loading teacher queries:', err);
+      setTeacherQueries([]);
+    }
+  };
+
+  // Load staff leave requests
+  const loadStaffLeaves = async () => {
+    try {
+      const leaves = await LeaveService.getAllStaffLeavesForAdmin();
+      setStaffLeaves(leaves);
+    } catch (err) {
+      console.error('Error loading staff leaves:', err);
+      setStaffLeaves([]);
+    }
+  };
+
+  // Gallery functions
+  const fetchGalleryImages = async () => {
+    try {
+      const images = await galleryService.getAllImages();
+      setGalleryImages(images);
+    } catch (error) {
+      console.error('Error fetching gallery images:', error);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const handleImageUpload = async () => {
+    if (!selectedFile) {
+      alert('Please select an image file');
+      return;
+    }
+
+    if (!imageTitle.trim()) {
+      alert('Please enter an image title');
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      
+      const adminData = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      await galleryService.uploadImage({
+        file: selectedFile,
+        title: imageTitle,
+        description: imageDescription,
+        uploadedByType: 'ADMIN',
+        uploadedById: adminData.id || 1,
+        uploadedByName: adminData.name || 'Admin',
+        sessionId: 1
+      });
+
+      alert('Image uploaded successfully!');
+      
+      // Reset form
+      setSelectedFile(null);
+      setImageTitle('');
+      setImageDescription('');
+      setShowGalleryUpload(false);
+      
+      // Refresh gallery
+      fetchGalleryImages();
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      alert(error.message || 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Handle responding to teacher query
+  const handleRespondToTeacherQuery = async (queryId: number) => {
+    try {
+      const response = queryResponseText[queryId];
+      if (!response || !response.trim()) {
+        alert('Please enter a response');
+        return;
+      }
+      await QueryService.respondToTeacherQuery({ queryId, response });
+      alert('Response sent successfully!');
+      setQueryResponseText({ ...queryResponseText, [queryId]: '' });
+      await loadTeacherQueries();
+    } catch (err: any) {
+      alert('Failed to send response: ' + err.message);
+    }
+  };
+
+  // Handle staff leave action
+  const handleStaffLeaveAction = async (leaveId: number, status: 'APPROVED' | 'REJECTED') => {
+    try {
+      const adminResponse = leaveResponseText[leaveId] || (status === 'APPROVED' ? 'Approved' : 'Rejected');
+      await LeaveService.updateStaffLeaveStatus(leaveId, { status, adminResponse });
+      alert(`Leave request ${status.toLowerCase()} successfully!`);
+      setLeaveResponseText({ ...leaveResponseText, [leaveId]: '' });
+      await loadStaffLeaves();
+    } catch (err: any) {
+      alert('Failed to process leave request: ' + err.message);
+    }
+  };
+
+  // Render teacher queries
+  const renderTeacherQueries = () => (
+    <div style={{ padding: '1.5rem' }}>
+      <h2 style={{ marginBottom: '1.5rem' }}>Teacher Queries</h2>
+      {teacherQueries.length === 0 ? (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '3rem', 
+          backgroundColor: '#f3f4f6', 
+          borderRadius: '8px' 
+        }}>
+          <p style={{ fontSize: '1.1rem', color: '#6b7280' }}>No teacher queries at the moment</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {teacherQueries.map((query) => (
+            <div key={query.id} style={{
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '1.5rem',
+              backgroundColor: query.status === 'RESPONDED' ? '#f0fdf4' : '#fff'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 0.5rem 0' }}>{query.subject}</h3>
+                  <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: 0 }}>
+                    From Teacher • {query.createdAt ? new Date(query.createdAt).toLocaleString() : 'N/A'}
+                  </p>
+                </div>
+                <span style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '12px',
+                  fontSize: '0.9rem',
+                  height: 'fit-content',
+                  backgroundColor: query.status === 'OPEN' ? '#fef3c7' : '#d1fae5',
+                  color: query.status === 'OPEN' ? '#92400e' : '#065f46',
+                  fontWeight: '500'
+                }}>
+                  {query.status}
+                </span>
+              </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <p style={{ fontWeight: '500', marginBottom: '0.5rem' }}>Query:</p>
+                <p style={{ color: '#374151' }}>{query.content}</p>
+              </div>
+
+              {query.response && (
+                <div style={{ 
+                  marginTop: '1rem', 
+                  padding: '1rem', 
+                  backgroundColor: '#f3f4f6', 
+                  borderRadius: '6px' 
+                }}>
+                  <p style={{ fontWeight: '500', marginBottom: '0.5rem' }}>Your Response:</p>
+                  <p style={{ color: '#374151' }}>{query.response}</p>
+                  <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                    Responded: {query.respondedAt ? new Date(query.respondedAt).toLocaleString() : 'N/A'}
+                  </p>
+                </div>
+              )}
+
+              {query.status === 'OPEN' && (
+                <div style={{ 
+                  marginTop: '1rem',
+                  backgroundColor: '#f8fafc',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <label style={{ 
+                    display: 'block', 
+                    marginBottom: '0.5rem', 
+                    fontWeight: '600',
+                    color: '#374151'
+                  }}>
+                    Your Response to Teacher:
+                  </label>
+                  <textarea
+                    key={`query-${query.id || 'unknown'}-textarea`}
+                    value={queryResponseText[query.id!] || ''}
+                    onChange={(e) => {
+                      if (query.id) {
+                        setQueryResponseText({ ...queryResponseText, [query.id]: e.target.value });
+                      }
+                    }}
+                    placeholder="Type your response to the teacher..."
+                    rows={4}
+                    style={{ 
+                      width: '100%', 
+                      padding: '0.75rem', 
+                      borderRadius: '6px', 
+                      border: '2px solid #e2e8f0',
+                      fontSize: '0.95rem',
+                      fontFamily: 'inherit',
+                      marginBottom: '0.75rem',
+                      resize: 'vertical',
+                      transition: 'border-color 0.2s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                  />
+                  <button 
+                    onClick={() => {
+                      if (query.id && queryResponseText[query.id]?.trim()) {
+                        handleRespondToTeacherQuery(query.id);
+                      }
+                    }}
+                    disabled={!query.id || !queryResponseText[query.id]?.trim()}
+                    style={{ 
+                      backgroundColor: '#10b981', 
+                      color: 'white', 
+                      padding: '0.75rem 1.5rem', 
+                      borderRadius: '6px',
+                      border: 'none',
+                      fontSize: '0.95rem',
+                      fontWeight: '500',
+                      cursor: (!query.id || !queryResponseText[query.id]?.trim()) ? 'not-allowed' : 'pointer',
+                      opacity: (!query.id || !queryResponseText[query.id]?.trim()) ? 0.5 : 1,
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    📤 Send Response
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // Render staff leave requests
+  const renderStaffLeaves = () => (
+    <div style={{ padding: '1.5rem' }}>
+      <h2 style={{ marginBottom: '1.5rem' }}>Staff Leave Requests</h2>
+      {staffLeaves.length === 0 ? (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '3rem', 
+          backgroundColor: '#f3f4f6', 
+          borderRadius: '8px' 
+        }}>
+          <p style={{ fontSize: '1.1rem', color: '#6b7280' }}>No staff leave requests at the moment</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {staffLeaves.map((leave) => (
+            <div key={leave.id} style={{
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '1.5rem',
+              backgroundColor: leave.status === 'APPROVED' ? '#f0fdf4' : leave.status === 'REJECTED' ? '#fef2f2' : '#fff'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 0.5rem 0' }}>{leave.teacherName || 'Teacher'}</h3>
+                  <p style={{ color: '#6b7280', fontSize: '0.9rem', margin: 0 }}>
+                    {leave.reason}
+                  </p>
+                </div>
+                <span style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '12px',
+                  fontSize: '0.9rem',
+                  height: 'fit-content',
+                  backgroundColor: leave.status === 'PENDING' ? '#fef3c7' : leave.status === 'APPROVED' ? '#d1fae5' : '#fee2e2',
+                  color: leave.status === 'PENDING' ? '#92400e' : leave.status === 'APPROVED' ? '#065f46' : '#991b1b',
+                  fontWeight: '500'
+                }}>
+                  {leave.status}
+                </span>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <p style={{ fontWeight: '500', marginBottom: '0.25rem', fontSize: '0.9rem' }}>Start Date:</p>
+                  <p style={{ color: '#374151' }}>{leave.startDate}</p>
+                </div>
+                <div>
+                  <p style={{ fontWeight: '500', marginBottom: '0.25rem', fontSize: '0.9rem' }}>End Date:</p>
+                  <p style={{ color: '#374151' }}>{leave.endDate}</p>
+                </div>
+              </div>
+
+              <p style={{ marginBottom: '1rem' }}>
+                <strong>Days Requested:</strong> {leave.daysRequested}
+              </p>
+
+              {leave.adminResponse && (
+                <div style={{ 
+                  marginTop: '1rem', 
+                  padding: '1rem', 
+                  backgroundColor: '#f3f4f6', 
+                  borderRadius: '6px' 
+                }}>
+                  <p style={{ fontWeight: '500', marginBottom: '0.5rem' }}>Your Response:</p>
+                  <p style={{ color: '#374151' }}>{leave.adminResponse}</p>
+                  {leave.processedBy && (
+                    <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                      Processed by: {leave.processedBy}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {leave.status === 'PENDING' && (
+                <div style={{ marginTop: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                    Remarks (optional):
+                  </label>
+                  <input
+                    type="text"
+                    value={leaveResponseText[leave.id] || ''}
+                    onChange={(e) => setLeaveResponseText({ ...leaveResponseText, [leave.id]: e.target.value })}
+                    placeholder="Add any remarks..."
+                    style={{ 
+                      width: '100%', 
+                      padding: '0.75rem', 
+                      borderRadius: '6px', 
+                      border: '1px solid #d1d5db',
+                      fontSize: '1rem',
+                      marginBottom: '0.75rem'
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button 
+                      onClick={() => handleStaffLeaveAction(leave.id, 'APPROVED')}
+                      style={{ 
+                        backgroundColor: '#10b981', 
+                        color: 'white', 
+                        padding: '0.75rem 1.5rem', 
+                        borderRadius: '6px',
+                        border: 'none',
+                        fontSize: '1rem',
+                        fontWeight: '500',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Approve
+                    </button>
+                    <button 
+                      onClick={() => handleStaffLeaveAction(leave.id, 'REJECTED')}
+                      style={{ 
+                        backgroundColor: '#ef4444', 
+                        color: 'white', 
+                        padding: '0.75rem 1.5rem', 
+                        borderRadius: '6px',
+                        border: 'none',
+                        fontSize: '1rem',
+                        fontWeight: '500',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   const renderSessions = () => (
     <SessionManagement 
       onSessionChange={() => {
@@ -1568,6 +1974,164 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const renderRegistration = () => (
     <div className="registration-section">
       <UnifiedRegistration onRegistrationSuccess={fetchAllData} />
+    </div>
+  );
+
+  const renderGallery = () => (
+    <div className="gallery-section">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2 style={{ margin: 0 }}>School Gallery</h2>
+        <button
+          onClick={() => setShowGalleryUpload(!showGalleryUpload)}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: '#4CAF50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}
+        >
+          {showGalleryUpload ? 'Cancel' : '+ Upload Image'}
+        </button>
+      </div>
+
+      {showGalleryUpload && (
+        <div style={{
+          backgroundColor: '#f3f4f6',
+          padding: '20px',
+          borderRadius: '8px',
+          marginBottom: '30px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <h3 style={{ marginTop: 0 }}>Upload New Image</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Title:</label>
+              <input
+                type="text"
+                value={imageTitle}
+                onChange={(e) => setImageTitle(e.target.value)}
+                placeholder="Enter image title"
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '5px',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Description (Optional):</label>
+              <textarea
+                value={imageDescription}
+                onChange={(e) => setImageDescription(e.target.value)}
+                placeholder="Enter image description"
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '5px',
+                  fontSize: '14px',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Select Image:</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '5px',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+            <button
+              onClick={handleImageUpload}
+              disabled={uploadingImage}
+              style={{
+                padding: '12px',
+                backgroundColor: uploadingImage ? '#9ca3af' : '#3B82F6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}
+            >
+              {uploadingImage ? 'Uploading...' : 'Upload Image'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: '20px',
+        marginTop: '20px'
+      }}>
+        {galleryImages.length === 0 ? (
+          <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#6b7280', fontSize: '16px' }}>
+            No images in gallery yet. Upload your first image!
+          </p>
+        ) : (
+          galleryImages.map(image => (
+            <div
+              key={image.id}
+              style={{
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-5px)';
+                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+              }}
+            >
+              <img
+                src={image.imageUrl}
+                alt={image.title}
+                style={{
+                  width: '100%',
+                  height: '200px',
+                  objectFit: 'cover'
+                }}
+              />
+              <div style={{ padding: '15px' }}>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '16px', color: '#1f2937' }}>{image.title}</h4>
+                {image.description && (
+                  <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#6b7280', lineHeight: '1.4' }}>
+                    {image.description}
+                  </p>
+                )}
+                <div style={{ fontSize: '12px', color: '#9ca3af' }}>
+                  <p style={{ margin: '4px 0' }}>📤 {image.uploadedByName}</p>
+                  <p style={{ margin: '4px 0' }}>📅 {new Date(image.createdAt).toLocaleDateString()}</p>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 
@@ -1595,8 +2159,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         return <EventManagement />;
       case 'timetable':
         return <TeacherAssignment />;
+      case 'teacher-queries':
+        return renderTeacherQueries();
+      case 'staff-leaves':
+        return renderStaffLeaves();
       case 'inbox':
         return renderInbox();
+      case 'gallery':
+        return renderGallery();
       default:
         return renderOverview();
     }
@@ -1686,10 +2256,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               🎉 Events
             </button>
             <button
+              className={`nav-item ${activeTab === 'teacher-queries' ? 'active' : ''}`}
+              onClick={() => setActiveTab('teacher-queries')}
+            >
+              ❓ Teacher Queries
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'staff-leaves' ? 'active' : ''}`}
+              onClick={() => setActiveTab('staff-leaves')}
+            >
+              📝 Staff Leaves
+            </button>
+            <button
               className={`nav-item ${activeTab === 'inbox' ? 'active' : ''}`}
               onClick={() => setActiveTab('inbox')}
             >
               📧 Inbox
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'gallery' ? 'active' : ''}`}
+              onClick={() => setActiveTab('gallery')}
+            >
+              🖼️ Gallery
             </button>
           </nav>
         </aside>

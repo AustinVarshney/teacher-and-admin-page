@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './ClassManagement.css';
 import ClassService, { ClassResponse, ClassData } from '../../services/classService';
-import DropdownService, { SessionOption } from '../../services/dropdownService';
+import DropdownService, { SessionOption, TeacherOption } from '../../services/dropdownService';
 
 interface ClassManagementProps {
   onClassChange?: () => void;
@@ -10,6 +10,7 @@ interface ClassManagementProps {
 const ClassManagement: React.FC<ClassManagementProps> = ({ onClassChange }) => {
   const [classes, setClasses] = useState<ClassResponse[]>([]);
   const [sessions, setSessions] = useState<SessionOption[]>([]);
+  const [teachers, setTeachers] = useState<TeacherOption[]>([]);
   const [selectedSession, setSelectedSession] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -21,7 +22,8 @@ const ClassManagement: React.FC<ClassManagementProps> = ({ onClassChange }) => {
   const [formData, setFormData] = useState<ClassData>({
     className: '',
     feeAmount: 0,
-    sessionId: 0
+    sessionId: 0,
+    classTeacherId: 0
   });
   
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
@@ -46,8 +48,13 @@ const ClassManagement: React.FC<ClassManagementProps> = ({ onClassChange }) => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const sessionsData = await DropdownService.getAllSessions();
+      const [sessionsData, teachersData] = await Promise.all([
+        DropdownService.getAllSessions(),
+        DropdownService.getAllActiveTeachers()
+      ]);
+      
       setSessions(sessionsData);
+      setTeachers(teachersData);
       
       // Auto-select active session
       const activeSession = sessionsData.find(s => s.isActive || s.active);
@@ -84,7 +91,8 @@ const ClassManagement: React.FC<ClassManagementProps> = ({ onClassChange }) => {
     setFormData({
       className: '',
       feeAmount: 0,
-      sessionId: selectedSession || 0
+      sessionId: selectedSession || 0,
+      classTeacherId: 0
     });
     setFormErrors({});
     setShowForm(true);
@@ -96,7 +104,8 @@ const ClassManagement: React.FC<ClassManagementProps> = ({ onClassChange }) => {
     setFormData({
       className: classItem.className,
       feeAmount: classItem.feeAmount,
-      sessionId: classItem.sessionId
+      sessionId: classItem.sessionId,
+      classTeacherId: classItem.classTeacherId || 0
     });
     setFormErrors({});
     setShowForm(true);
@@ -129,7 +138,8 @@ const ClassManagement: React.FC<ClassManagementProps> = ({ onClassChange }) => {
     const validationError = ClassService.validateClassData(
       formData.className,
       formData.feeAmount,
-      formData.sessionId
+      formData.sessionId,
+      formData.classTeacherId
     );
 
     if (validationError) {
@@ -402,6 +412,31 @@ const ClassManagement: React.FC<ClassManagementProps> = ({ onClassChange }) => {
                 />
                 {formErrors.feeAmount && (
                   <span className="error-text">{formErrors.feeAmount}</span>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="classTeacherId">
+                  Class Teacher <span className="required">*</span>
+                  <span className="hint">Select the teacher for this class</span>
+                </label>
+                <select
+                  id="classTeacherId"
+                  value={formData.classTeacherId}
+                  onChange={(e) => setFormData({ ...formData, classTeacherId: parseInt(e.target.value) })}
+                  required
+                  disabled={submitting}
+                  className={formErrors.classTeacherId ? 'error' : ''}
+                >
+                  <option value={0}>Select Teacher</option>
+                  {teachers.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.name} {teacher.designation && `(${teacher.designation})`}
+                    </option>
+                  ))}
+                </select>
+                {formErrors.classTeacherId && (
+                  <span className="error-text">{formErrors.classTeacherId}</span>
                 )}
               </div>
 

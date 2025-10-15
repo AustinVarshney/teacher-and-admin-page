@@ -17,6 +17,13 @@ export interface SessionOption {
   isActive?: boolean;  // Optional for backwards compatibility
 }
 
+export interface TeacherOption {
+  id: number;
+  name: string;
+  email?: string;
+  designation?: string;
+}
+
 export interface ClassInfoResponse {
   id: number;
   className: string;
@@ -93,6 +100,27 @@ export class DropdownService {
       name: session.sessionName || session.name || '',
       isActive: session.isActive || session.active || false
     }));
+  }
+
+  // Get all active teachers
+  static async getAllActiveTeachers(): Promise<TeacherOption[]> {
+    try {
+      const response = await api.get('/teachers/active');
+      
+      if (response.status >= 200 && response.status < 300) {
+        const teachers = response.data.data || [];
+        return teachers.map((teacher: any) => ({
+          id: teacher.id,
+          name: teacher.name,
+          email: teacher.email,
+          designation: teacher.designation
+        }));
+      }
+      throw new Error(response.data.message || 'Failed to fetch teachers');
+    } catch (error: any) {
+      console.error('Failed to fetch teachers from API:', error);
+      return [];
+    }
   }
 }
 

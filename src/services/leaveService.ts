@@ -1,145 +1,74 @@
 import { api } from './api';
 
-// Interface definitions
-export interface LeaveRequestData {
-  id?: number;
-  studentPan?: string;
-  studentName?: string;
-  studentClass?: string;
-  section?: string;
-  reason: string;
+// Student Leave Request Interfaces
+export interface StudentLeaveRequestData {
   startDate: string; // YYYY-MM-DD
   endDate: string;   // YYYY-MM-DD
-  requestDate?: string;
-  status?: 'pending' | 'approved' | 'rejected';
-  imageUrl?: string;
-  teacherRemarks?: string;
-  classId?: number;
+  reason: string;
 }
 
-export interface LeaveRequestFilter {
-  page?: number;
-  size?: number;
-  status?: string;
-  classId?: number;
-  startDate?: string;
-  endDate?: string;
+export interface StudentLeaveResponse {
+  id: number;
+  studentPan: string;
+  studentName?: string;
+  startDate: string;
+  endDate: string;
+  daysRequested: number;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  classTeacherName?: string;
+  classTeacherResponse?: string;
+  sessionName?: string;
+  processedAt?: string;
+  createdAt?: string;
+}
+
+export interface LeaveActionRequest {
+  status: 'APPROVED' | 'REJECTED';
+  responseMessage: string;
+}
+
+// Staff Leave Request Interfaces
+export interface StaffLeaveRequestData {
+  teacherId: number;
+  startDate: string;
+  endDate: string;
+  reason: string;
+}
+
+export interface StaffLeaveResponse {
+  id: number;
+  teacherId: number;
+  teacherName?: string;
+  startDate: string;
+  endDate: string;
+  daysRequested: number;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  adminResponse?: string;
+  processedBy?: string;
+  processedAt?: string;
+  sessionId?: number;
+  sessionName?: string;
+  totalLeavesAllowed?: number;
+  remainingLeavesBalance?: number;
+}
+
+export interface StaffLeaveStatusUpdate {
+  status: 'APPROVED' | 'REJECTED';
+  adminResponse: string;
 }
 
 export class LeaveService {
-  // Get all leave requests for teacher's classes
-  static async getLeaveRequestsForTeacher(filter: LeaveRequestFilter = {}) {
+  // ============ STUDENT LEAVE REQUESTS ============
+  
+  // Student: Request leave
+  static async createStudentLeaveRequest(leaveData: StudentLeaveRequestData): Promise<void> {
     try {
-      const params = new URLSearchParams();
-      
-      if (filter.page !== undefined) params.append('page', filter.page.toString());
-      if (filter.size !== undefined) params.append('size', filter.size.toString());
-      if (filter.status) params.append('status', filter.status);
-      if (filter.classId) params.append('classId', filter.classId.toString());
-      if (filter.startDate) params.append('startDate', filter.startDate);
-      if (filter.endDate) params.append('endDate', filter.endDate);
-
-      const response = await api.get(`/leave-requests/teacher?${params.toString()}`);
+      const response = await api.post('/leave/request', leaveData);
       
       if (response.status >= 200 && response.status < 300) {
-        return response.data.data || [];
-      }
-      throw new Error(response.data.message || 'Failed to fetch leave requests');
-    } catch (error: any) {
-      const message = error.response?.data?.message || error.message || 'Failed to fetch leave requests';
-      throw new Error(message);
-    }
-  }
-
-  // Get leave request by ID
-  static async getLeaveRequestById(id: number) {
-    try {
-      const response = await api.get(`/leave-requests/${id}`);
-      
-      if (response.status >= 200 && response.status < 300) {
-        return response.data.data;
-      }
-      throw new Error(response.data.message || 'Failed to fetch leave request');
-    } catch (error: any) {
-      const message = error.response?.data?.message || error.message || 'Failed to fetch leave request';
-      throw new Error(message);
-    }
-  }
-
-  // Get leave requests by class
-  static async getLeaveRequestsByClass(classId: number, status?: string) {
-    try {
-      const params = new URLSearchParams();
-      if (status) params.append('status', status);
-
-      const response = await api.get(`/leave-requests/class/${classId}?${params.toString()}`);
-      
-      if (response.status >= 200 && response.status < 300) {
-        return response.data.data || [];
-      }
-      throw new Error(response.data.message || 'Failed to fetch leave requests');
-    } catch (error: any) {
-      const message = error.response?.data?.message || error.message || 'Failed to fetch leave requests';
-      throw new Error(message);
-    }
-  }
-
-  // Get leave requests by student PAN
-  static async getLeaveRequestsByStudent(panNumber: string) {
-    try {
-      const response = await api.get(`/leave-requests/student/${panNumber}`);
-      
-      if (response.status >= 200 && response.status < 300) {
-        return response.data.data || [];
-      }
-      throw new Error(response.data.message || 'Failed to fetch leave requests');
-    } catch (error: any) {
-      const message = error.response?.data?.message || error.message || 'Failed to fetch leave requests';
-      throw new Error(message);
-    }
-  }
-
-  // Approve leave request
-  static async approveLeaveRequest(id: number, teacherRemarks?: string) {
-    try {
-      const response = await api.put(`/leave-requests/${id}/approve`, {
-        teacherRemarks: teacherRemarks || 'Approved'
-      });
-      
-      if (response.status >= 200 && response.status < 300) {
-        return response.data.data;
-      }
-      throw new Error(response.data.message || 'Failed to approve leave request');
-    } catch (error: any) {
-      const message = error.response?.data?.message || error.message || 'Failed to approve leave request';
-      throw new Error(message);
-    }
-  }
-
-  // Reject leave request
-  static async rejectLeaveRequest(id: number, teacherRemarks?: string) {
-    try {
-      const response = await api.put(`/leave-requests/${id}/reject`, {
-        teacherRemarks: teacherRemarks || 'Rejected'
-      });
-      
-      if (response.status >= 200 && response.status < 300) {
-        return response.data.data;
-      }
-      throw new Error(response.data.message || 'Failed to reject leave request');
-    } catch (error: any) {
-      const message = error.response?.data?.message || error.message || 'Failed to reject leave request';
-      throw new Error(message);
-    }
-  }
-
-  // Create leave request (for admin or teacher creating on behalf of student)
-  static async createLeaveRequest(leaveData: LeaveRequestData) {
-    try {
-      const response = await api.post('/leave-requests', leaveData);
-      
-      if (response.status >= 200 && response.status < 300) {
-        return response.data.data;
+        return;
       }
       throw new Error(response.data.message || 'Failed to create leave request');
     } catch (error: any) {
@@ -148,47 +77,121 @@ export class LeaveService {
     }
   }
 
-  // Update leave request
-  static async updateLeaveRequest(id: number, leaveData: LeaveRequestData) {
+  // Student: Get my leave requests
+  static async getMyStudentLeaves(): Promise<StudentLeaveResponse[]> {
     try {
-      const response = await api.put(`/leave-requests/${id}`, leaveData);
+      const response = await api.get('/leave/my');
       
       if (response.status >= 200 && response.status < 300) {
-        return response.data.data;
+        return response.data.data || [];
       }
-      throw new Error(response.data.message || 'Failed to update leave request');
+      throw new Error(response.data.message || 'Failed to fetch leave requests');
     } catch (error: any) {
-      const message = error.response?.data?.message || error.message || 'Failed to update leave request';
+      const message = error.response?.data?.message || error.message || 'Failed to fetch leave requests';
       throw new Error(message);
     }
   }
 
-  // Delete leave request
-  static async deleteLeaveRequest(id: number) {
+  // Teacher: Get student leave requests assigned to me
+  static async getStudentLeavesForTeacher(status?: string): Promise<StudentLeaveResponse[]> {
     try {
-      const response = await api.delete(`/leave-requests/${id}`);
+      const params = status ? `?status=${status}` : '';
+      const response = await api.get(`/leave/teacher${params}`);
       
       if (response.status >= 200 && response.status < 300) {
-        return response.data.data;
+        return response.data.data || [];
       }
-      throw new Error(response.data.message || 'Failed to delete leave request');
+      throw new Error(response.data.message || 'Failed to fetch leave requests');
     } catch (error: any) {
-      const message = error.response?.data?.message || error.message || 'Failed to delete leave request';
+      const message = error.response?.data?.message || error.message || 'Failed to fetch leave requests';
       throw new Error(message);
     }
   }
 
-  // Get pending leave requests count for teacher
-  static async getPendingLeaveRequestsCount() {
+  // Teacher: Take action on student leave request
+  static async takeActionOnStudentLeave(leaveId: number, action: LeaveActionRequest): Promise<void> {
     try {
-      const response = await api.get('/leave-requests/teacher/pending-count');
+      const response = await api.put(`/leave/action/${leaveId}`, action);
       
       if (response.status >= 200 && response.status < 300) {
-        return response.data.data || 0;
+        return;
       }
-      throw new Error(response.data.message || 'Failed to fetch pending count');
+      throw new Error(response.data.message || 'Failed to update leave status');
     } catch (error: any) {
-      const message = error.response?.data?.message || error.message || 'Failed to fetch pending count';
+      const message = error.response?.data?.message || error.message || 'Failed to update leave status';
+      throw new Error(message);
+    }
+  }
+
+  // ============ STAFF/TEACHER LEAVE REQUESTS ============
+  
+  // Teacher: Request leave
+  static async createStaffLeaveRequest(leaveData: StaffLeaveRequestData): Promise<string> {
+    try {
+      const response = await api.post('/staff-leaves/request', leaveData);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data || 'Leave request submitted successfully';
+      }
+      throw new Error(response.data.message || 'Failed to create leave request');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to create leave request';
+      throw new Error(message);
+    }
+  }
+
+  // Teacher: Get my leave requests
+  static async getMyStaffLeaves(status?: string): Promise<StaffLeaveResponse[]> {
+    try {
+      const params = status ? `?status=${status}` : '';
+      const response = await api.get(`/staff-leaves/my-leaves${params}`);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data || [];
+      }
+      throw new Error(response.data.message || 'Failed to fetch leave requests');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch leave requests';
+      throw new Error(message);
+    }
+  }
+
+  // Admin: Get all staff leave requests
+  static async getAllStaffLeavesForAdmin(
+    status?: string, 
+    sessionId?: number, 
+    teacherId?: number
+  ): Promise<StaffLeaveResponse[]> {
+    try {
+      const params = new URLSearchParams();
+      if (status) params.append('status', status);
+      if (sessionId) params.append('sessionId', sessionId.toString());
+      if (teacherId) params.append('teacherId', teacherId.toString());
+
+      const queryString = params.toString();
+      const response = await api.get(`/staff-leaves${queryString ? '?' + queryString : ''}`);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data || [];
+      }
+      throw new Error(response.data.message || 'Failed to fetch leave requests');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch leave requests';
+      throw new Error(message);
+    }
+  }
+
+  // Admin: Update staff leave status
+  static async updateStaffLeaveStatus(leaveId: number, statusUpdate: StaffLeaveStatusUpdate): Promise<string> {
+    try {
+      const response = await api.put(`/staff-leaves/${leaveId}/status`, statusUpdate);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data || 'Leave status updated successfully';
+      }
+      throw new Error(response.data.message || 'Failed to update leave status');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to update leave status';
       throw new Error(message);
     }
   }

@@ -9,6 +9,11 @@ import { AttendanceService } from '../../services/attendanceService';
 import TransferCertificateService from '../../services/transferCertificateService';
 import { TransferCertificateRequest, TCRequest } from '../../types';
 import NotificationService, { NotificationDto } from '../../services/notificationService';
+import LeaveService, { StudentLeaveResponse } from '../../services/leaveService';
+import QueryService, { StudentQueryResponse } from '../../services/queryService';
+import resultService, { StudentResultsDTO } from '../../services/resultService';
+import VideoLectureService, { VideoLecture as VideoLectureType } from '../../services/videoLectureService';
+import galleryService from '../../services/galleryService';
 
 interface StudentDashboardProps {
   onLogout: () => void;
@@ -19,8 +24,7 @@ type Holiday = { id: string; date: string; name: string; };
 type TimetableEntry = { id: string; day: string; period: number; start: string; end: string; subject: string; teacher: string; };
 type EventItem = { id: string; startDate: string; endDate: string; name: string; description?: string; type: 'sports' | 'cultural' | 'academic' | 'meeting'; };
 type FeeStatus = { total: number; paid: number; pending: number; status: 'paid' | 'pending' | 'overdue'; };
-type EnquiryContact = { id: string; subject: string; teacher: string; phone: string; };
-type VideoLecture = { id: string; title: string; subject: string; className: string; url: string; };
+type EnquiryContact = { id: string; subject: string; teacher: string; phone: string; isClassTeacher?: boolean; };
 type GalleryItem = { id: string; title: string; imageUrl: string; };
 type VehicleRoute = { id: string; route: string; pickup: string; drop: string; note?: string; };
 type PreviousClassRecord = { id: string; classLabel: string; schoolName: string; passingYear: string; percentage: string; grade: string; gallery: GalleryItem[]; resultUrl?: string; certificateUrl?: string; };
@@ -33,6 +37,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
   const [queryText, setQueryText] = useState('');
   const [leaveImage, setLeaveImage] = useState<File | null>(null);
   const [leaveSubject, setLeaveSubject] = useState('');
+  const [leaveStartDate, setLeaveStartDate] = useState('');
+  const [leaveEndDate, setLeaveEndDate] = useState('');
+  const [myLeaveRequests, setMyLeaveRequests] = useState<StudentLeaveResponse[]>([]);
+  const [myQueries, setMyQueries] = useState<StudentQueryResponse[]>([]);
+  const [selectedQueryTeacher, setSelectedQueryTeacher] = useState<number | null>(null);
 
   // State for real data from API
   const [student, setStudent] = useState<any>(null);
@@ -45,6 +54,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
   const [error, setError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<NotificationDto[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [studentResults, setStudentResults] = useState<StudentResultsDTO | null>(null);
+  const [resultsLoading, setResultsLoading] = useState(false);
+  const [videoLectures, setVideoLectures] = useState<VideoLectureType[]>([]);
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
 
   // Transfer Certificate state
   const [tcRequests, setTcRequests] = useState<TransferCertificateRequest[]>([]);
@@ -224,7 +237,48 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
     };
 
     fetchStudentData();
+    fetchMyQueries();
+    fetchMyLeaveRequests();
+    fetchVideoLectures();
   }, []);
+
+  // Fetch video lectures for student's class
+  const fetchVideoLectures = async () => {
+    try {
+      if (student?.currentClass && student?.section) {
+        const lectures = await VideoLectureService.getVideoLecturesByClass(
+          student.currentClass,
+          student.section
+        );
+        setVideoLectures(lectures || []);
+      }
+    } catch (err) {
+      console.warn('No video lectures available:', err);
+      setVideoLectures([]);
+    }
+  };
+
+  const fetchGalleryImages = async () => {
+    try {
+      const images = await galleryService.getAllImages();
+      setGallery(images.map(img => ({
+        id: img.id.toString(),
+        title: img.title || 'Untitled',
+        imageUrl: img.imageUrl
+      })));
+    } catch (err) {
+      console.warn('No gallery images available:', err);
+      setGallery([]);
+    }
+  };
+
+  // Re-fetch video lectures and gallery when student data is loaded
+  useEffect(() => {
+    if (student?.currentClass && student?.section) {
+      fetchVideoLectures();
+    }
+    fetchGalleryImages();
+  }, [student]);
 
   // Fetch Transfer Certificate requests
   useEffect(() => {
@@ -401,16 +455,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
   // enquiryNumbers is now replaced by enquiryContacts state (fetched from API based on timetable)
 
-  const lectures: VideoLecture[] = [
-    { id: 'v1', title: 'Quadratic Equations', subject: 'Mathematics', className: '10th A', url: '#' },
-    { id: 'v2', title: 'Chemical Reactions', subject: 'Science', className: '10th A', url: '#' },
-  ];
-
-  const gallery: GalleryItem[] = [
-    { id: 'g1', title: 'School Building', imageUrl: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=600&q=80&auto=format&fit=crop' },
-    { id: 'g2', title: 'Annual Day', imageUrl: 'https://images.unsplash.com/photo-1515165562835-c3b8c2b2a831?w=600&q=80&auto=format&fit=crop' },
-    { id: 'g3', title: 'Science Fair', imageUrl: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=600&q=80&auto=format&fit=crop' },
-  ];
+  // Video lectures and gallery are now fetched from backend - removed static data
 
   const routes: VehicleRoute[] = [
     { id: 'r1', route: 'Route 1 - Sector 21', pickup: '07:10 AM', drop: '02:30 PM', note: 'Expect delay on Mondays' },
@@ -536,16 +581,75 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
     return weeks;
   };
 
-  const handleSubmitQuery = (e: React.FormEvent) => {
+  const handleSubmitQuery = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!queryText.trim()) return;
-    alert(`Query sent to ${querySubject} teacher.`);
-    setQueryText('');
+    if (!queryText.trim() || !selectedQueryTeacher) {
+      alert('Please select a teacher and enter your question.');
+      return;
+    }
+    
+    try {
+      await QueryService.raiseStudentQuery({
+        teacherId: selectedQueryTeacher,
+        subject: querySubject,
+        content: queryText
+      });
+      alert('Query sent successfully to the teacher!');
+      setQueryText('');
+      // Refresh queries list
+      fetchMyQueries();
+    } catch (error: any) {
+      alert('Failed to send query: ' + error.message);
+    }
   };
 
   const handleLeaveUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) setLeaveImage(file);
+  };
+
+  const handleSubmitLeave = async () => {
+    if (!leaveSubject.trim() || !leaveStartDate || !leaveEndDate) {
+      alert('Please fill in all fields: reason, start date, and end date.');
+      return;
+    }
+
+    try {
+      await LeaveService.createStudentLeaveRequest({
+        startDate: leaveStartDate,
+        endDate: leaveEndDate,
+        reason: leaveSubject
+      });
+      alert('Leave request submitted successfully to your class teacher!');
+      setLeaveSubject('');
+      setLeaveStartDate('');
+      setLeaveEndDate('');
+      setLeaveImage(null);
+      // Refresh leave requests list
+      fetchMyLeaveRequests();
+    } catch (error: any) {
+      alert('Failed to submit leave request: ' + error.message);
+    }
+  };
+
+  // Fetch student's own queries
+  const fetchMyQueries = async () => {
+    try {
+      const queries = await QueryService.getMyStudentQueries();
+      setMyQueries(queries);
+    } catch (error: any) {
+      console.error('Error fetching queries:', error);
+    }
+  };
+
+  // Fetch student's own leave requests
+  const fetchMyLeaveRequests = async () => {
+    try {
+      const leaves = await LeaveService.getMyStudentLeaves();
+      setMyLeaveRequests(leaves);
+    } catch (error: any) {
+      console.error('Error fetching leave requests:', error);
+    }
   };
 
   const SectionHeader: React.FC<{ icon: string; title: string; }> = ({ icon, title }) => (
@@ -831,7 +935,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {/* Student Profile - Home Tab */}
         {!loading && !error && student && activeTab === 'home' && (
-          <section className="profile-section">
+          <section className="profile-section" style={{marginBottom: '0'}}>
             <SectionHeader icon="👤" title="Student Profile" />
             <div className="profile-info">
               <img className="profile-photo" src={student.photo} alt="Student" />
@@ -846,7 +950,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'enquiry' && (
           <section className="query-section">
-            <SectionHeader icon="📞" title="Enquiry Numbers" />
+            <SectionHeader icon="📞" title="Teacher Contacts" />
             {loading ? (
               <div className="loading-message" style={{textAlign: 'center', padding: '2rem'}}>Loading teacher contacts...</div>
             ) : enquiryContacts.length === 0 ? (
@@ -855,9 +959,34 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 <p>Teacher contacts will appear here once your timetable is assigned.</p>
               </div>
             ) : (
-              <div className="attendance-info">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {enquiryContacts.map(c => (
-                  <p key={c.id}><strong>{c.subject}:</strong> {c.teacher} — {c.phone}</p>
+                  <div key={c.id} style={{
+                    padding: '1rem',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    backgroundColor: c.isClassTeacher ? '#f0fdf4' : '#fff',
+                    borderLeft: c.isClassTeacher ? '4px solid #10b981' : '1px solid #e5e7eb'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong style={{ fontSize: '1.1rem', color: '#1f2937' }}>{c.subject}</strong>
+                        <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280' }}>{c.teacher}</p>
+                      </div>
+                      {c.isClassTeacher && (
+                        <span style={{
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '12px',
+                          fontSize: '0.85rem',
+                          backgroundColor: '#d1fae5',
+                          color: '#065f46',
+                          fontWeight: '500'
+                        }}>
+                          Class Teacher
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -867,53 +996,328 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         {activeTab === 'lectures' && (
           <section className="events-section">
             <SectionHeader icon="🎥" title="Live Class & Video Lectures" />
-            <div className="events-container">
-              {lectures.map(v => (
-                <div key={v.id} className="event-card academic">
-                  <div className="event-name">{v.title}</div>
-                  <div className="event-date">{v.subject} • {v.className}</div>
-                  <button className="submit-btn" onClick={() => window.open(v.url, '_blank')}>Watch</button>
-                </div>
-              ))}
-            </div>
+            {loading ? (
+              <div className="loading-message" style={{textAlign: 'center', padding: '2rem'}}>
+                Loading video lectures...
+              </div>
+            ) : videoLectures.length === 0 ? (
+              <div className="no-data-message" style={{textAlign: 'center', padding: '2rem'}}>
+                <p>📹 No video lectures available yet.</p>
+                <p style={{fontSize: '0.9rem', color: '#666'}}>
+                  Video lectures uploaded by your teachers will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="events-container">
+                {videoLectures.map(v => {
+                  const thumbnailUrl = VideoLectureService.getYouTubeThumbnail(v.youtubeLink);
+                  const embedUrl = VideoLectureService.getYouTubeEmbedUrl(v.youtubeLink);
+                  
+                  return (
+                    <div key={v.id} className="event-card academic" style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      height: '100%'
+                    }}>
+                      {/* Thumbnail */}
+                      <div style={{
+                        width: '100%',
+                        height: '160px',
+                        backgroundImage: `url(${thumbnailUrl})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        borderRadius: '8px 8px 0 0',
+                        marginBottom: '0.75rem',
+                        position: 'relative'
+                      }}>
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: '3rem',
+                          color: 'white',
+                          textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                          cursor: 'pointer'
+                        }}>
+                          ▶️
+                        </div>
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="event-name" style={{fontSize: '1.1rem', fontWeight: '600'}}>
+                        {v.title}
+                      </div>
+                      <div className="event-date" style={{marginTop: '0.5rem'}}>
+                        📚 {v.subject}
+                      </div>
+                      {v.topic && (
+                        <div style={{fontSize: '0.85rem', color: '#666', marginTop: '0.25rem'}}>
+                          Topic: {v.topic}
+                        </div>
+                      )}
+                      {v.teacherName && (
+                        <div style={{fontSize: '0.85rem', color: '#666', marginTop: '0.25rem'}}>
+                          👨‍🏫 {v.teacherName}
+                        </div>
+                      )}
+                      {v.duration && (
+                        <div style={{fontSize: '0.85rem', color: '#666', marginTop: '0.25rem'}}>
+                          ⏱️ {v.duration}
+                        </div>
+                      )}
+                      
+                      <button 
+                        className="submit-btn" 
+                        style={{marginTop: 'auto', width: '100%'}}
+                        onClick={() => window.open(embedUrl, '_blank')}
+                      >
+                        ▶️ Watch Video
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
         )}
 
         {/* Timetable Tab - Using API Data */}
-        {!loading && !error && activeTab === 'timetable' && (
-          <section className="profile-section">
-            <SectionHeader icon="📅" title="Current Class Timetable" />
-            {timetable.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                <p>No timetable available for your class yet.</p>
-                <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Please contact your administrator.</p>
-              </div>
-            ) : (
-              <table className="holidays-table">
-                <thead>
-                  <tr>
-                    <th>Day</th>
-                    <th>Period</th>
-                    <th>Time</th>
-                    <th>Subject</th>
-                    <th>Teacher</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {timetable.map(tt => (
-                    <tr key={tt.id}>
-                      <td>{tt.day}</td>
-                      <td>{tt.period}</td>
-                      <td>{tt.start} - {tt.end}</td>
-                      <td>{tt.subject}</td>
-                      <td>{tt.teacher}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-        )}
+        {!loading && !error && activeTab === 'timetable' && (() => {
+          const weekDays = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+          const periods = [1, 2, 3, 4, 'LUNCH', 5, 6, 7, 8];
+          const periodTimes = [
+            '08:00 - 09:00',
+            '09:00 - 10:00',
+            '10:00 - 11:00',
+            '11:00 - 12:00',
+            '12:00 - 01:00',
+            '01:00 - 02:00',
+            '02:00 - 03:00',
+            '03:00 - 04:00',
+            '04:00 - 05:00'
+          ];
+
+          // Organize timetable data by day and period
+          const timetableGrid: {[key: string]: {[key: number]: any}} = {};
+          weekDays.forEach(day => {
+            timetableGrid[day] = {};
+          });
+
+          timetable.forEach(tt => {
+            const day = tt.day.toUpperCase();
+            if (timetableGrid[day]) {
+              timetableGrid[day][tt.period] = tt;
+            }
+          });
+
+          // Get unique teachers with their subjects
+          const teacherSubjectMap = new Map<string, Set<string>>();
+          timetable.forEach(tt => {
+            if (!teacherSubjectMap.has(tt.teacher)) {
+              teacherSubjectMap.set(tt.teacher, new Set());
+            }
+            teacherSubjectMap.get(tt.teacher)?.add(tt.subject);
+          });
+
+          return (
+            <section className="profile-section">
+              <SectionHeader icon="📅" title="Weekly Class Timetable" />
+              {timetable.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                  <p>No timetable available for your class yet.</p>
+                  <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Please contact your administrator.</p>
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ 
+                    width: '100%', 
+                    borderCollapse: 'collapse',
+                    marginBottom: '2rem',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#3b82f6', color: 'white' }}>
+                        <th style={{ 
+                          padding: '1rem', 
+                          border: '1px solid #ddd',
+                          fontWeight: '600',
+                          textAlign: 'center',
+                          minWidth: '120px'
+                        }}>Day / Period</th>
+                        {periods.map((period, idx) => (
+                          <th key={idx} style={{ 
+                            padding: '1rem', 
+                            border: '1px solid #ddd',
+                            fontWeight: '600',
+                            textAlign: 'center',
+                            backgroundColor: period === 'LUNCH' ? '#fbbf24' : period === 8 ? '#8b5cf6' : '#3b82f6',
+                            minWidth: '140px'
+                          }}>
+                            <div>{period === 'LUNCH' ? 'LUNCH' : `Period ${period}`}</div>
+                            <div style={{ fontSize: '0.8rem', fontWeight: '400', marginTop: '0.25rem' }}>
+                              {periodTimes[idx]}
+                            </div>
+                            {period === 8 && (
+                              <div style={{ fontSize: '0.75rem', fontWeight: '500', marginTop: '0.25rem' }}>
+                                (Diary Period)
+                              </div>
+                            )}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weekDays.map((day, dayIdx) => (
+                        <tr key={day} style={{ 
+                          backgroundColor: dayIdx % 2 === 0 ? '#f9fafb' : 'white' 
+                        }}>
+                          <td style={{ 
+                            padding: '1rem', 
+                            border: '1px solid #ddd',
+                            fontWeight: '600',
+                            backgroundColor: '#e5e7eb',
+                            textAlign: 'center'
+                          }}>
+                            {day}
+                          </td>
+                          {periods.map((period, periodIdx) => {
+                            if (period === 'LUNCH') {
+                              return (
+                                <td key={periodIdx} style={{ 
+                                  padding: '1rem', 
+                                  border: '1px solid #ddd',
+                                  backgroundColor: '#fef3c7',
+                                  textAlign: 'center',
+                                  fontWeight: '600',
+                                  color: '#92400e'
+                                }}>
+                                  🍽️ LUNCH BREAK
+                                </td>
+                              );
+                            }
+                            
+                            const slot = timetableGrid[day][period as number];
+                            return (
+                              <td key={periodIdx} style={{ 
+                                padding: '0.75rem', 
+                                border: '1px solid #ddd',
+                                textAlign: 'center',
+                                backgroundColor: period === 8 ? '#f3e8ff' : 'inherit',
+                                verticalAlign: 'middle'
+                              }}>
+                                {slot ? (
+                                  <div>
+                                    <div style={{ 
+                                      fontWeight: '600', 
+                                      color: '#1f2937',
+                                      marginBottom: '0.25rem'
+                                    }}>
+                                      {slot.subject}
+                                    </div>
+                                    <div style={{ 
+                                      fontSize: '0.85rem', 
+                                      color: '#6b7280'
+                                    }}>
+                                      {slot.teacher}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>
+                                    -
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Teacher Legend */}
+                  <div style={{ 
+                    marginTop: '1.5rem',
+                    padding: '1.5rem',
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '8px',
+                    border: '1px solid #e5e7eb'
+                  }}>
+                    <h3 style={{ 
+                      marginBottom: '1rem', 
+                      fontSize: '1.1rem',
+                      fontWeight: '600',
+                      color: '#1f2937'
+                    }}>
+                      📚 Teachers & Subjects
+                    </h3>
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                      gap: '1rem'
+                    }}>
+                      {Array.from(teacherSubjectMap.entries()).map(([teacher, subjects]) => (
+                        <div key={teacher} style={{ 
+                          padding: '0.75rem 1rem',
+                          backgroundColor: 'white',
+                          borderRadius: '6px',
+                          border: '1px solid #d1d5db',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                        }}>
+                          <div style={{ 
+                            fontWeight: '600', 
+                            color: '#3b82f6',
+                            marginBottom: '0.5rem'
+                          }}>
+                            👨‍🏫 {teacher}
+                          </div>
+                          <div style={{ 
+                            fontSize: '0.9rem', 
+                            color: '#6b7280'
+                          }}>
+                            {Array.from(subjects).join(', ')}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Legend for special periods */}
+                  <div style={{ 
+                    marginTop: '1rem',
+                    display: 'flex',
+                    gap: '1.5rem',
+                    flexWrap: 'wrap',
+                    padding: '1rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '6px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div style={{ 
+                        width: '20px', 
+                        height: '20px', 
+                        backgroundColor: '#fef3c7',
+                        border: '1px solid #fbbf24',
+                        borderRadius: '4px'
+                      }}></div>
+                      <span style={{ fontSize: '0.9rem' }}>Lunch Break</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div style={{ 
+                        width: '20px', 
+                        height: '20px', 
+                        backgroundColor: '#f3e8ff',
+                        border: '1px solid #8b5cf6',
+                        borderRadius: '4px'
+                      }}></div>
+                      <span style={{ fontSize: '0.9rem' }}>Diary Period (Period 8)</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+          );
+        })()}
 
         {activeTab === 'attendance' && (() => {
           const now = new Date();
@@ -1089,43 +1493,307 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         {activeTab === 'results' && (
           <section className="results-section">
             <SectionHeader icon="📊" title="Academic Results" />
-            <div className="result-card">
-              <h3>Mid Term - 2025</h3>
-              <table className="results-table" aria-label="Marks Breakdown">
-                <thead>
-                  <tr>
-                    <th>Subject</th>
-                    <th>Marks</th>
-                    <th>Total</th>
-                    <th>Percentage</th>
-                    <th>Grade</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    { subject: 'Mathematics', marks: 85, total: 100, grade: 'A' },
-                    { subject: 'Science', marks: 88, total: 100, grade: 'A' },
-                    { subject: 'English', marks: 78, total: 100, grade: 'B+' },
-                    { subject: 'Social Science', marks: 82, total: 100, grade: 'A' },
-                    { subject: 'Hindi', marks: 80, total: 100, grade: 'A' },
-                  ].map(row => (
-                    <tr key={row.subject}>
-                      <td>{row.subject}</td>
-                      <td>{row.marks}</td>
-                      <td>{row.total}</td>
-                      <td>{Math.round((row.marks / row.total) * 100)}%</td>
-                      <td>{row.grade}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div style={{ marginTop: 12 }}>
-                <strong>Current Percentage:</strong> {Math.round(((85+88+78+82+80) / (5*100)) * 100)}%
+            
+            {/* Fetch Results Button */}
+            {!studentResults && !resultsLoading && student?.pan && (
+              <div style={{
+                textAlign: 'center',
+                padding: '3rem',
+                backgroundColor: '#f9fafb',
+                borderRadius: '12px',
+                border: '1px solid #e5e7eb'
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
+                <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+                  View your complete academic performance across all exams
+                </p>
+                <button 
+                  className="download-btn"
+                  onClick={async () => {
+                    setResultsLoading(true);
+                    try {
+                      const results = await resultService.getStudentAllResults(student.pan);
+                      setStudentResults(results);
+                    } catch (err) {
+                      console.error('Error fetching results:', err);
+                      alert('Failed to load results. Please try again.');
+                    } finally {
+                      setResultsLoading(false);
+                    }
+                  }}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    fontSize: '1rem'
+                  }}
+                >
+                  📈 Load My Results
+                </button>
               </div>
-              <div style={{ marginTop: 16 }}>
-                <button className="download-btn" onClick={() => alert('Downloading current result PDF...')}>Download Result PDF</button>
+            )}
+
+            {/* Loading State */}
+            {resultsLoading && (
+              <div style={{
+                textAlign: 'center',
+                padding: '3rem',
+                color: '#6b7280'
+              }}>
+                <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
+                <p>Loading your results...</p>
               </div>
-            </div>
+            )}
+
+            {/* Results Display */}
+            {studentResults && !resultsLoading && (
+              <div>
+                {/* Student Info Summary */}
+                <div style={{
+                  backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  padding: '1.5rem',
+                  borderRadius: '12px',
+                  marginBottom: '1.5rem',
+                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                }}>
+                  <h3 style={{ margin: '0 0 0.5rem 0' }}>
+                    {studentResults.studentName}
+                  </h3>
+                  <p style={{ margin: '0', opacity: 0.9 }}>
+                    {studentResults.className} - Section {studentResults.section}
+                  </p>
+                </div>
+
+                {/* Exam Results */}
+                {studentResults.examResults && studentResults.examResults.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    {studentResults.examResults.map((examResult, index) => (
+                      <div key={index} className="result-card" style={{
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '12px',
+                        padding: '1.5rem',
+                        backgroundColor: 'white',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                      }}>
+                        {/* Exam Header */}
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '1rem',
+                          paddingBottom: '1rem',
+                          borderBottom: '2px solid #f3f4f6'
+                        }}>
+                          <div>
+                            <h3 style={{ margin: '0 0 0.25rem 0', color: '#1f2937' }}>
+                              {examResult.examName}
+                            </h3>
+                            {examResult.examDate && (
+                              <p style={{ margin: 0, color: '#6b7280', fontSize: '0.9rem' }}>
+                                📅 {new Date(examResult.examDate).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{
+                              fontSize: '2rem',
+                              fontWeight: '700',
+                              color: examResult.percentage >= 90 ? '#10b981' : 
+                                     examResult.percentage >= 75 ? '#3b82f6' :
+                                     examResult.percentage >= 60 ? '#f59e0b' : '#ef4444'
+                            }}>
+                              {examResult.percentage.toFixed(1)}%
+                            </div>
+                            <div style={{
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '12px',
+                              backgroundColor: examResult.overallGrade === 'A+' || examResult.overallGrade === 'A' ? '#d1fae5' :
+                                             examResult.overallGrade === 'B+' || examResult.overallGrade === 'B' ? '#dbeafe' :
+                                             examResult.overallGrade === 'C' ? '#fef3c7' : '#fee2e2',
+                              color: examResult.overallGrade === 'A+' || examResult.overallGrade === 'A' ? '#065f46' :
+                                     examResult.overallGrade === 'B+' || examResult.overallGrade === 'B' ? '#1e40af' :
+                                     examResult.overallGrade === 'C' ? '#92400e' : '#991b1b',
+                              fontSize: '0.9rem',
+                              fontWeight: '600',
+                              marginTop: '0.5rem'
+                            }}>
+                              Grade: {examResult.overallGrade}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Subject-wise Marks Table */}
+                        <table className="results-table" style={{
+                          width: '100%',
+                          borderCollapse: 'collapse'
+                        }}>
+                          <thead>
+                            <tr style={{ backgroundColor: '#f3f4f6' }}>
+                              <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600', borderBottom: '2px solid #e5e7eb' }}>Subject</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '600', borderBottom: '2px solid #e5e7eb' }}>Marks Obtained</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '600', borderBottom: '2px solid #e5e7eb' }}>Total Marks</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '600', borderBottom: '2px solid #e5e7eb' }}>Percentage</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '600', borderBottom: '2px solid #e5e7eb' }}>Grade</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {examResult.subjectScores && examResult.subjectScores.map((subjectScore, subIndex) => (
+                              <tr key={subIndex} style={{ 
+                                backgroundColor: subIndex % 2 === 0 ? 'white' : '#f9fafb',
+                                borderBottom: '1px solid #e5e7eb'
+                              }}>
+                                <td style={{ padding: '0.75rem', fontWeight: '500' }}>
+                                  {subjectScore.subjectName}
+                                </td>
+                                <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                                  {subjectScore.marks}
+                                </td>
+                                <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                                  {subjectScore.maxMarks}
+                                </td>
+                                <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                                  {((subjectScore.marks / subjectScore.maxMarks) * 100).toFixed(1)}%
+                                </td>
+                                <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                                  <span style={{
+                                    padding: '0.25rem 0.5rem',
+                                    borderRadius: '6px',
+                                    backgroundColor: subjectScore.grade === 'A+' || subjectScore.grade === 'A' ? '#d1fae5' :
+                                                   subjectScore.grade === 'B+' || subjectScore.grade === 'B' ? '#dbeafe' :
+                                                   subjectScore.grade === 'C' ? '#fef3c7' : '#fee2e2',
+                                    color: subjectScore.grade === 'A+' || subjectScore.grade === 'A' ? '#065f46' :
+                                           subjectScore.grade === 'B+' || subjectScore.grade === 'B' ? '#1e40af' :
+                                           subjectScore.grade === 'C' ? '#92400e' : '#991b1b',
+                                    fontWeight: '600',
+                                    fontSize: '0.85rem'
+                                  }}>
+                                    {subjectScore.grade}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+
+                        {/* Total Summary */}
+                        <div style={{
+                          marginTop: '1rem',
+                          padding: '1rem',
+                          backgroundColor: '#f9fafb',
+                          borderRadius: '8px',
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                          gap: '1rem'
+                        }}>
+                          <div>
+                            <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                              Total Obtained
+                            </div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1f2937' }}>
+                              {examResult.obtainedMarks}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                              Total Marks
+                            </div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1f2937' }}>
+                              {examResult.totalMarks}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                              Percentage
+                            </div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#3b82f6' }}>
+                              {examResult.percentage.toFixed(2)}%
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Download Button */}
+                        <div style={{ marginTop: '1rem', textAlign: 'right' }}>
+                          <button 
+                            className="download-btn"
+                            onClick={() => {
+                              // In real implementation, generate PDF
+                              alert(`Downloading result for ${examResult.examName}...`);
+                            }}
+                            style={{
+                              backgroundColor: '#10b981',
+                              color: 'white',
+                              padding: '0.5rem 1rem',
+                              borderRadius: '6px',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontWeight: '500'
+                            }}
+                          >
+                            📄 Download PDF
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Overall Summary Card */}
+                    <div style={{
+                      border: '2px solid #3b82f6',
+                      borderRadius: '12px',
+                      padding: '1.5rem',
+                      backgroundColor: '#eff6ff'
+                    }}>
+                      <h4 style={{ margin: '0 0 1rem 0', color: '#1e40af' }}>
+                        📈 Overall Performance Summary
+                      </h4>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                        gap: '1rem'
+                      }}>
+                        <div>
+                          <div style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                            Total Exams
+                          </div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
+                            {studentResults.examResults.length}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                            Average Percentage
+                          </div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3b82f6' }}>
+                            {(studentResults.examResults.reduce((sum, exam) => sum + exam.percentage, 0) / 
+                              studentResults.examResults.length).toFixed(2)}%
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                            Best Performance
+                          </div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#10b981' }}>
+                            {Math.max(...studentResults.examResults.map(e => e.percentage)).toFixed(1)}%
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '3rem',
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '12px',
+                    border: '1px dashed #d1d5db'
+                  }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📝</div>
+                    <p style={{ color: '#6b7280', margin: 0 }}>
+                      No exam results available yet. Results will appear here once published by your teachers.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         )}
 
@@ -1224,10 +1892,18 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
             <SectionHeader icon="❓" title="Ask Query" />
             <form className="query-form" onSubmit={handleSubmitQuery}>
               <div className="form-group">
-                <label>Subject</label>
-                <select value={querySubject} onChange={(e) => setQuerySubject(e.target.value)}>
+                <label>Select Teacher & Subject</label>
+                <select 
+                  value={selectedQueryTeacher || ''} 
+                  onChange={(e) => {
+                    const selected = enquiryContacts.find(c => c.id === e.target.value);
+                    setSelectedQueryTeacher(selected ? Number(selected.id) : null);
+                    setQuerySubject(selected?.subject || '');
+                  }}
+                >
+                  <option value="">Select a teacher...</option>
                   {enquiryContacts.map(c => (
-                    <option key={c.id} value={c.subject}>{c.subject} — {c.teacher}</option>
+                    <option key={c.id} value={c.id}>{c.subject} — {c.teacher}</option>
                   ))}
                 </select>
               </div>
@@ -1237,6 +1913,54 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
               </div>
               <button className="submit-btn" type="submit">Send Query</button>
             </form>
+
+            {/* Display submitted queries */}
+            {myQueries.length > 0 && (
+              <div style={{ marginTop: '2rem' }}>
+                <h3 style={{ marginBottom: '1rem' }}>My Queries</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {myQueries.map((query) => (
+                    <div key={query.id} style={{
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      padding: '1rem',
+                      backgroundColor: query.status === 'RESPONDED' ? '#f0fdf4' : '#fff'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <strong>{query.subject}</strong>
+                        <span style={{
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '12px',
+                          fontSize: '0.85rem',
+                          backgroundColor: query.status === 'OPEN' ? '#fef3c7' : query.status === 'RESPONDED' ? '#d1fae5' : '#e5e7eb',
+                          color: query.status === 'OPEN' ? '#92400e' : query.status === 'RESPONDED' ? '#065f46' : '#1f2937'
+                        }}>
+                          {query.status}
+                        </span>
+                      </div>
+                      <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                        To: {query.teacherName}
+                      </p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>Question:</strong> {query.content}</p>
+                      {query.response && (
+                        <div style={{ marginTop: '0.75rem', padding: '0.75rem', backgroundColor: '#f3f4f6', borderRadius: '6px' }}>
+                          <p><strong>Teacher's Response:</strong></p>
+                          <p style={{ marginTop: '0.25rem' }}>{query.response}</p>
+                          {query.respondedAt && (
+                            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                              Responded on: {new Date(query.respondedAt).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                        Sent on: {query.createdAt ? new Date(query.createdAt).toLocaleString() : 'N/A'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
@@ -1245,7 +1969,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
             <SectionHeader icon="📝" title="Leave Request" />
             <div className="query-form">
               <div className="form-group">
-                <label>Subject</label>
+                <label>Reason</label>
                 <input 
                   type="text"
                   placeholder="Reason (e.g., Medical, Family)"
@@ -1254,19 +1978,84 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 />
               </div>
               <div className="form-group">
-                <label>Upload supporting image</label>
+                <label>Start Date</label>
+                <input 
+                  type="date"
+                  value={leaveStartDate}
+                  onChange={(e) => setLeaveStartDate(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>End Date</label>
+                <input 
+                  type="date"
+                  value={leaveEndDate}
+                  onChange={(e) => setLeaveEndDate(e.target.value)}
+                  min={leaveStartDate}
+                />
+              </div>
+              <div className="form-group">
+                <label>Upload supporting image (optional)</label>
                 <input type="file" accept="image/*" onChange={handleLeaveUpload} />
                 {leaveImage && <p style={{ marginTop: 8, color: '#555' }}>Selected: {leaveImage.name}</p>}
               </div>
               <button 
                 className="tc-btn" 
-                onClick={() => alert(`Leave request submitted${leaveSubject ? `: ${leaveSubject}` : ''}.`)}
+                onClick={handleSubmitLeave}
                 type="button"
-                disabled={!leaveSubject}
+                disabled={!leaveSubject || !leaveStartDate || !leaveEndDate}
               >
                 Submit Leave Request
               </button>
             </div>
+
+            {/* Display submitted leave requests */}
+            {myLeaveRequests.length > 0 && (
+              <div style={{ marginTop: '2rem' }}>
+                <h3 style={{ marginBottom: '1rem' }}>My Leave Requests</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {myLeaveRequests.map((leave) => (
+                    <div key={leave.id} style={{
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      padding: '1rem',
+                      backgroundColor: leave.status === 'APPROVED' ? '#f0fdf4' : leave.status === 'REJECTED' ? '#fef2f2' : '#fff'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <strong>{leave.reason}</strong>
+                        <span style={{
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '12px',
+                          fontSize: '0.85rem',
+                          backgroundColor: leave.status === 'PENDING' ? '#fef3c7' : leave.status === 'APPROVED' ? '#d1fae5' : leave.status === 'REJECTED' ? '#fee2e2' : '#e5e7eb',
+                          color: leave.status === 'PENDING' ? '#92400e' : leave.status === 'APPROVED' ? '#065f46' : leave.status === 'REJECTED' ? '#991b1b' : '#1f2937'
+                        }}>
+                          {leave.status}
+                        </span>
+                      </div>
+                      <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                        Class Teacher: {leave.classTeacherName || 'Not assigned'}
+                      </p>
+                      <p><strong>Duration:</strong> {leave.startDate} to {leave.endDate} ({leave.daysRequested} days)</p>
+                      {leave.classTeacherResponse && (
+                        <div style={{ marginTop: '0.75rem', padding: '0.75rem', backgroundColor: '#f3f4f6', borderRadius: '6px' }}>
+                          <p><strong>Teacher's Response:</strong></p>
+                          <p style={{ marginTop: '0.25rem' }}>{leave.classTeacherResponse}</p>
+                        </div>
+                      )}
+                      <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                        Submitted on: {leave.createdAt ? new Date(leave.createdAt).toLocaleString() : 'N/A'}
+                      </p>
+                      {leave.processedAt && (
+                        <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                          Processed on: {new Date(leave.processedAt).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 

@@ -301,12 +301,16 @@ export interface CalendarEvent {
 export interface TransferCertificateRequest {
   id: number;
   studentPan: string;
+  studentPanNumber?: string; // Alias
   studentName: string;
   className?: string;
+  sessionName?: string;
   reason: string;
   requestDate: string;
   status: TCStatus;
-  adminRemarks?: string;
+  adminReply?: string; // Admin's response message
+  adminRemarks?: string; // Legacy field
+  adminActionDate?: string;
   teacherRemarks?: string;
   forwardedToTeacher?: string;
   forwardedDate?: string;

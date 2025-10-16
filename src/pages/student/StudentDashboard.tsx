@@ -2243,9 +2243,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                             <td style={{ padding: '12px' }}>{req.reason}</td>
                             <td style={{ padding: '12px' }}>{getStatusBadge(req.status)}</td>
                             <td style={{ padding: '12px' }}>
-                              {req.adminRemarks && (
+                              {req.adminReply && (
                                 <div style={{ marginBottom: '4px' }}>
-                                  <strong>Admin:</strong> {req.adminRemarks}
+                                  <strong>Admin:</strong> {req.adminReply}
                                 </div>
                               )}
                               {req.teacherRemarks && (
@@ -2253,7 +2253,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                                   <strong>Teacher:</strong> {req.teacherRemarks}
                                 </div>
                               )}
-                              {!req.adminRemarks && !req.teacherRemarks && '-'}
+                              {!req.adminReply && !req.teacherRemarks && '-'}
                             </td>
                           </tr>
                         );

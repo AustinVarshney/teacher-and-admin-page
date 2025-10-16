@@ -13,8 +13,6 @@ import QueryService, { StudentQueryResponse, TeacherQueryResponse } from '../../
 import VideoLectureService, { VideoLecture } from '../../services/videoLectureService';
 import MarkAttendance from './MarkAttendance';
 import NotificationService, { NotificationDto } from '../../services/notificationService';
-import resultService from '../../services/resultService';
-import SubjectService from '../../services/subjectService';
 import galleryService from '../../services/galleryService';
 
 interface TeacherDashboardProps {
@@ -1325,214 +1323,420 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
 
   const renderQueries = () => (
     <div className="queries-section">
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3>Student Queries</h3>
+      {/* Section Header */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '2rem',
+        padding: '1.5rem',
+        backgroundColor: '#ffffff',
+        borderRadius: '12px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+      }}>
+        <div>
+          <h2 style={{ margin: 0, color: '#1f2937', fontSize: '1.5rem', fontWeight: '700' }}>
+            📬 Student Queries
+          </h2>
+          <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.9rem' }}>
+            Manage and respond to student questions
+          </p>
+        </div>
+        <button 
+          onClick={() => setShowQueryForm(!showQueryForm)}
+          style={{
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '8px',
+            border: 'none',
+            fontSize: '0.95rem',
+            fontWeight: '600',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            transition: 'all 0.2s',
+            boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
+        >
+          {showQueryForm ? '✕ Cancel' : '✉️ Query Admin'}
+        </button>
+      </div>
+
+      {/* Form for teacher to send query to admin */}
+      {showQueryForm && (
+        <div style={{ 
+          backgroundColor: '#ffffff',
+          borderRadius: '12px',
+          padding: '2rem',
+          marginBottom: '2rem',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          border: '2px solid #3b82f6'
+        }}>
+          <h3 style={{ margin: '0 0 1.5rem', color: '#1f2937', fontSize: '1.25rem', fontWeight: '600' }}>
+            Send Query to Admin
+          </h3>
+          
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '0.5rem', 
+              fontWeight: '600', 
+              color: '#374151',
+              fontSize: '0.95rem'
+            }}>
+              Subject <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <input 
+              type="text"
+              value={querySubject}
+              onChange={(e) => setQuerySubject(e.target.value)}
+              placeholder="Enter query subject..."
+              style={{ 
+                width: '100%', 
+                padding: '0.75rem', 
+                borderRadius: '8px', 
+                border: '2px solid #e5e7eb',
+                fontSize: '0.95rem',
+                transition: 'border-color 0.2s'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+              onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+            />
+          </div>
+
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '0.5rem', 
+              fontWeight: '600', 
+              color: '#374151',
+              fontSize: '0.95rem'
+            }}>
+              Question <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <textarea 
+              value={queryContent}
+              onChange={(e) => setQueryContent(e.target.value)}
+              placeholder="Describe your query in detail..."
+              rows={5}
+              style={{ 
+                width: '100%', 
+                padding: '0.75rem', 
+                borderRadius: '8px', 
+                border: '2px solid #e5e7eb',
+                fontSize: '0.95rem',
+                fontFamily: 'inherit',
+                resize: 'vertical',
+                transition: 'border-color 0.2s'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+              onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+            />
+          </div>
+
           <button 
-            className="action-btn"
-            onClick={() => setShowQueryForm(!showQueryForm)}
-            style={{ backgroundColor: '#3b82f6', color: 'white', padding: '0.5rem 1rem', borderRadius: '6px' }}
+            onClick={handleSubmitTeacherQuery}
+            disabled={!querySubject.trim() || !queryContent.trim()}
+            style={{ 
+              backgroundColor: !querySubject.trim() || !queryContent.trim() ? '#9ca3af' : '#10b981',
+              color: 'white', 
+              padding: '0.75rem 2rem', 
+              borderRadius: '8px',
+              border: 'none',
+              fontSize: '1rem',
+              fontWeight: '600',
+              cursor: !querySubject.trim() || !queryContent.trim() ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
+            }}
           >
-            {showQueryForm ? 'Cancel' : '+ Send Query to Admin'}
+            📤 Submit Query
           </button>
         </div>
+      )}
 
-        {/* Form for teacher to send query to admin */}
-        {showQueryForm && (
-          <div style={{ 
-            border: '2px solid #3b82f6', 
-            borderRadius: '8px', 
-            padding: '1.5rem', 
-            marginBottom: '1.5rem',
-            backgroundColor: '#f0f9ff'
+      {/* Show teacher's own queries to admin */}
+      {myTeacherQueries.length > 0 && (
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ 
+            marginBottom: '1rem', 
+            color: '#1f2937',
+            fontSize: '1.25rem',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
           }}>
-            <h4 style={{ marginBottom: '1rem' }}>Send Query to Admin</h4>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Subject</label>
-              <input 
-                type="text"
-                value={querySubject}
-                onChange={(e) => setQuerySubject(e.target.value)}
-                placeholder="Enter query subject..."
-                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ddd' }}
-              />
-            </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Question</label>
-              <textarea 
-                value={queryContent}
-                onChange={(e) => setQueryContent(e.target.value)}
-                placeholder="Describe your query in detail..."
-                rows={4}
-                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ddd' }}
-              />
-            </div>
-            <button 
-              className="action-btn"
-              onClick={handleSubmitTeacherQuery}
-              style={{ backgroundColor: '#10b981', color: 'white', padding: '0.5rem 1.5rem', borderRadius: '6px' }}
-            >
-              Submit Query
-            </button>
-          </div>
-        )}
-
-        {/* Show teacher's own queries to admin */}
-        {myTeacherQueries.length > 0 && (
-          <div style={{ marginBottom: '2rem' }}>
-            <h4 style={{ marginBottom: '1rem', color: '#3b82f6' }}>My Queries to Admin</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {myTeacherQueries.map((query) => (
-                <div key={query.id} style={{
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  padding: '1rem',
-                  backgroundColor: query.status === 'RESPONDED' ? '#f0fdf4' : '#fff'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <strong>{query.subject}</strong>
-                    <span style={{
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '12px',
-                      fontSize: '0.85rem',
-                      backgroundColor: query.status === 'OPEN' ? '#fef3c7' : query.status === 'RESPONDED' ? '#d1fae5' : '#e5e7eb',
-                      color: query.status === 'OPEN' ? '#92400e' : query.status === 'RESPONDED' ? '#065f46' : '#1f2937'
-                    }}>
-                      {query.status}
-                    </span>
-                  </div>
-                  <p style={{ marginBottom: '0.5rem' }}><strong>Question:</strong> {query.content}</p>
-                  {query.response && (
-                    <div style={{ marginTop: '0.75rem', padding: '0.75rem', backgroundColor: '#f3f4f6', borderRadius: '6px' }}>
-                      <p><strong>Admin's Response:</strong></p>
-                      <p style={{ marginTop: '0.25rem' }}>{query.response}</p>
-                    </div>
-                  )}
-                  <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                    Sent: {query.createdAt ? new Date(query.createdAt).toLocaleString() : 'N/A'}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Student queries list */}
-        <h4 style={{ marginBottom: '1rem' }}>Queries from Students</h4>
-        {studentQueries.length === 0 ? (
-          <div className="no-data-message">No student queries yet.</div>
-        ) : (
-          <div className="queries-list">
-            {studentQueries.map((query) => (
-              <div key={query.id} className={`query-card ${query.status?.toLowerCase()}`} style={{
+            <span style={{ fontSize: '1.5rem' }}>📨</span>
+            My Queries to Admin ({myTeacherQueries.length})
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {myTeacherQueries.map((query) => (
+              <div key={query.id} style={{
+                backgroundColor: '#ffffff',
                 border: '1px solid #e5e7eb',
+                borderLeft: `4px solid ${query.status === 'RESPONDED' ? '#10b981' : '#f59e0b'}`,
                 borderRadius: '8px',
-                padding: '1rem',
-                marginBottom: '1rem',
-                backgroundColor: query.status === 'RESPONDED' ? '#f0fdf4' : '#fff'
+                padding: '1.5rem',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                transition: 'transform 0.2s, box-shadow 0.2s'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
               }}>
-                <div className="query-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <h4 style={{ margin: 0 }}>{query.subject}</h4>
-                  <span className={`status-badge ${query.status?.toLowerCase()}`} style={{
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: '12px',
-                    fontSize: '0.85rem',
-                    backgroundColor: query.status === 'OPEN' ? '#fef3c7' : '#d1fae5',
-                    color: query.status === 'OPEN' ? '#92400e' : '#065f46'
-                  }}>
-                    {query.status}
-                  </span>
-                </div>
-                <div className="query-details">
-                  <p><strong>Question:</strong> {query.content}</p>
-                  <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                    Submitted: {query.createdAt ? new Date(query.createdAt).toLocaleString() : 'N/A'}
-                  </p>
-                </div>
-                {query.response && (
-                  <div className="query-reply" style={{ 
-                    marginTop: '0.75rem', 
-                    padding: '0.75rem', 
-                    backgroundColor: '#f3f4f6', 
-                    borderRadius: '6px' 
-                  }}>
-                    <p><strong>Your Reply:</strong> {query.response}</p>
-                    <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                      Reply Time: {query.respondedAt ? new Date(query.respondedAt).toLocaleString() : 'N/A'}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ margin: '0 0 0.5rem', color: '#1f2937', fontSize: '1.1rem', fontWeight: '600' }}>
+                      {query.subject}
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#6b7280' }}>
+                      📅 Sent: {query.createdAt ? new Date(query.createdAt).toLocaleString() : 'N/A'}
                     </p>
                   </div>
-                )}
-                <div className="query-actions" style={{ marginTop: '1rem' }}>
-                  {query.status === 'OPEN' && (
-                    <div style={{
-                      backgroundColor: '#f8fafc',
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0'
-                    }}>
-                      <label style={{ 
-                        display: 'block', 
-                        marginBottom: '0.5rem', 
-                        fontWeight: '600',
-                        color: '#374151'
-                      }}>
-                        Your Response:
-                      </label>
-                      <textarea
-                        key={`query-${query.id || 'unknown'}-textarea`}
-                        value={responseText[query.id!] || ''}
-                        onChange={(e) => {
-                          if (query.id) {
-                            setResponseText({ ...responseText, [query.id]: e.target.value });
-                          }
-                        }}
-                        placeholder="Type your response to the student..."
-                        rows={4}
-                        style={{ 
-                          width: '100%', 
-                          padding: '0.75rem', 
-                          borderRadius: '6px', 
-                          border: '2px solid #e2e8f0',
-                          marginBottom: '0.75rem',
-                          fontSize: '0.95rem',
-                          fontFamily: 'inherit',
-                          resize: 'vertical',
-                          transition: 'border-color 0.2s'
-                        }}
-                        onFocus={(e) => e.target.style.borderColor = '#667eea'}
-                        onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                      />
-                      <button 
-                        className="action-btn reply-btn"
-                        onClick={() => {
-                          if (query.id && responseText[query.id]?.trim()) {
-                            handleRespondToQuery(query.id);
-                          }
-                        }}
-                        disabled={!query.id || !responseText[query.id]?.trim()}
-                        style={{ 
-                          backgroundColor: '#10b981', 
-                          color: 'white', 
-                          padding: '0.75rem 1.5rem', 
-                          borderRadius: '6px',
-                          border: 'none',
-                          fontSize: '0.95rem',
-                          fontWeight: '500',
-                          cursor: (!query.id || !responseText[query.id]?.trim()) ? 'not-allowed' : 'pointer',
-                          opacity: (!query.id || !responseText[query.id]?.trim()) ? 0.5 : 1,
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        📤 Send Reply
-                      </button>
-                    </div>
-                  )}
+                  <span style={{
+                    padding: '0.5rem 1rem',
+                    borderRadius: '20px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    backgroundColor: query.status === 'OPEN' ? '#fef3c7' : '#d1fae5',
+                    color: query.status === 'OPEN' ? '#92400e' : '#065f46',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {query.status === 'OPEN' ? '⏳ Pending' : '✅ Responded'}
+                  </span>
                 </div>
+
+                <div style={{ 
+                  padding: '1rem', 
+                  backgroundColor: '#f9fafb', 
+                  borderRadius: '6px',
+                  marginBottom: query.response ? '1rem' : 0
+                }}>
+                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#374151', lineHeight: '1.6' }}>
+                    {query.content}
+                  </p>
+                </div>
+
+                {query.response && (
+                  <div style={{ 
+                    marginTop: '1rem', 
+                    padding: '1rem', 
+                    backgroundColor: '#ecfdf5', 
+                    borderRadius: '6px',
+                    borderLeft: '3px solid #10b981'
+                  }}>
+                    <p style={{ margin: '0 0 0.5rem', fontWeight: '600', color: '#065f46', fontSize: '0.9rem' }}>
+                      💬 Admin's Response:
+                    </p>
+                    <p style={{ margin: 0, color: '#047857', lineHeight: '1.6' }}>
+                      {query.response}
+                    </p>
+                    {query.respondedAt && (
+                      <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#059669' }}>
+                        📅 {new Date(query.respondedAt).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Student queries list */}
+      <div>
+        <h3 style={{ 
+          marginBottom: '1rem', 
+          color: '#1f2937',
+          fontSize: '1.25rem',
+          fontWeight: '600',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <span style={{ fontSize: '1.5rem' }}>👥</span>
+          Queries from Students ({studentQueries.length})
+        </h3>
+
+        {studentQueries.length === 0 ? (
+          <div style={{
+            textAlign: 'center',
+            padding: '3rem',
+            backgroundColor: '#f9fafb',
+            borderRadius: '12px',
+            border: '2px dashed #d1d5db'
+          }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
+            <p style={{ margin: 0, fontSize: '1.1rem', color: '#6b7280' }}>
+              No student queries yet
+            </p>
+            <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem', color: '#9ca3af' }}>
+              Student questions will appear here
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {studentQueries.map((query) => (
+              <div key={query.id} style={{
+                backgroundColor: '#ffffff',
+                border: '1px solid #e5e7eb',
+                borderLeft: `4px solid ${query.status === 'RESPONDED' ? '#10b981' : '#3b82f6'}`,
+                borderRadius: '8px',
+                padding: '1.5rem',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ margin: '0 0 0.5rem', color: '#1f2937', fontSize: '1.1rem', fontWeight: '600' }}>
+                      {query.subject}
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#6b7280' }}>
+                      👤 Student • 📅 {query.createdAt ? new Date(query.createdAt).toLocaleString() : 'N/A'}
+                    </p>
+                  </div>
+                  <span style={{
+                    padding: '0.5rem 1rem',
+                    borderRadius: '20px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    backgroundColor: query.status === 'OPEN' ? '#dbeafe' : '#d1fae5',
+                    color: query.status === 'OPEN' ? '#1e40af' : '#065f46',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {query.status === 'OPEN' ? '🔵 Open' : '✅ Replied'}
+                  </span>
+                </div>
+
+                <div style={{ 
+                  padding: '1rem', 
+                  backgroundColor: '#f9fafb', 
+                  borderRadius: '6px',
+                  marginBottom: '1rem'
+                }}>
+                  <p style={{ margin: 0, fontWeight: '600', fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                    ❓ Question:
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#374151', lineHeight: '1.6' }}>
+                    {query.content}
+                  </p>
+                </div>
+
+                {query.response && (
+                  <div style={{ 
+                    padding: '1rem', 
+                    backgroundColor: '#ecfdf5', 
+                    borderRadius: '6px',
+                    borderLeft: '3px solid #10b981',
+                    marginBottom: '1rem'
+                  }}>
+                    <p style={{ margin: '0 0 0.5rem', fontWeight: '600', color: '#065f46', fontSize: '0.9rem' }}>
+                      ✅ Your Reply:
+                    </p>
+                    <p style={{ margin: 0, color: '#047857', lineHeight: '1.6' }}>
+                      {query.response}
+                    </p>
+                    {query.respondedAt && (
+                      <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#059669' }}>
+                        📅 {new Date(query.respondedAt).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {query.status === 'OPEN' && (
+                  <div style={{
+                    backgroundColor: '#f8fafc',
+                    padding: '1.5rem',
+                    borderRadius: '8px',
+                    border: '2px solid #e2e8f0'
+                  }}>
+                    <label style={{ 
+                      display: 'block', 
+                      marginBottom: '0.75rem', 
+                      fontWeight: '600',
+                      color: '#1f2937',
+                      fontSize: '0.95rem'
+                    }}>
+                      💬 Your Response:
+                    </label>
+                    <textarea
+                      value={responseText[query.id!] || ''}
+                      onChange={(e) => {
+                        if (query.id) {
+                          setResponseText({ ...responseText, [query.id]: e.target.value });
+                        }
+                      }}
+                      placeholder="Type your response to the student..."
+                      rows={4}
+                      style={{ 
+                        width: '100%', 
+                        padding: '0.75rem', 
+                        borderRadius: '6px', 
+                        border: '2px solid #e2e8f0',
+                        marginBottom: '1rem',
+                        fontSize: '0.95rem',
+                        fontFamily: 'inherit',
+                        resize: 'vertical',
+                        transition: 'border-color 0.2s',
+                        pointerEvents: 'auto',
+                        userSelect: 'text',
+                        cursor: 'text',
+                        zIndex: 1,
+                        position: 'relative'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                      onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                    />
+                    <button 
+                      onClick={() => {
+                        if (query.id && responseText[query.id]?.trim()) {
+                          handleRespondToQuery(query.id);
+                        }
+                      }}
+                      disabled={!query.id || !responseText[query.id]?.trim()}
+                      style={{ 
+                        backgroundColor: (!query.id || !responseText[query.id]?.trim()) ? '#d1d5db' : '#10b981',
+                        color: 'white', 
+                        padding: '0.75rem 1.5rem', 
+                        borderRadius: '8px',
+                        border: 'none',
+                        fontSize: '0.95rem',
+                        fontWeight: '600',
+                        cursor: (!query.id || !responseText[query.id]?.trim()) ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: (!query.id || !responseText[query.id]?.trim()) ? 'none' : '0 2px 4px rgba(16, 185, 129, 0.3)'
+                      }}
+                      onMouseOver={(e) => {
+                        if (query.id && responseText[query.id]?.trim()) {
+                          e.currentTarget.style.backgroundColor = '#059669';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (query.id && responseText[query.id]?.trim()) {
+                          e.currentTarget.style.backgroundColor = '#10b981';
+                        }
+                      }}
+                    >
+                      📤 Send Reply
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
-      </div>
+      </div>  
     </div>
   );
 

@@ -14,6 +14,7 @@ import VideoLectureService, { VideoLecture } from '../../services/videoLectureSe
 import MarkAttendance from './MarkAttendance';
 import NotificationService, { NotificationDto } from '../../services/notificationService';
 import galleryService from '../../services/galleryService';
+import { SessionService } from '../../services/sessionService';
 
 interface TeacherDashboardProps {
   onLogout: () => void;
@@ -91,6 +92,31 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
   const [imageTitle, setImageTitle] = useState('');
   const [imageDescription, setImageDescription] = useState('');
   const [showGalleryUpload, setShowGalleryUpload] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
+
+  // Fetch active session
+  useEffect(() => {
+    const fetchActiveSession = async () => {
+      try {
+        setSessionLoading(true);
+        const session = await SessionService.getActiveSession();
+        console.log("--------------------------------------------------------------------------")
+        console.log('Active session fetched:', session);
+        if (session && session.id) {
+          setActiveSessionId(session.id);
+          console.log('Active session ID set to:', session.id);
+        } else {
+          console.warn('No active session found');
+        }
+      } catch (err) {
+        console.error('Failed to fetch active session:', err);
+      } finally {
+        setSessionLoading(false);
+      }
+    };
+    fetchActiveSession();
+  }, []);
 
   // Fetch student queries for teacher
   const fetchStudentQueries = async () => {
@@ -307,6 +333,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
       return;
     }
 
+    if (!activeSessionId) {
+      alert('No active session found. Please contact administrator to activate a session.');
+      return;
+    }
+
     setUploadingImage(true);
     try {
       await galleryService.uploadImage({
@@ -316,7 +347,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
         uploadedByType: 'TEACHER',
         uploadedById: parseInt(teacher.id),
         uploadedByName: teacher.name,
-        sessionId: 1 // You may want to fetch current session ID dynamically
+        sessionId: activeSessionId
       });
 
       alert('Image uploaded successfully!');
@@ -326,7 +357,37 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
       setShowGalleryUpload(false);
       fetchGalleryImages();
     } catch (err: any) {
-      alert('Failed to upload image: ' + err.message);
+      console.error('Error uploading image:', err);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to upload image';
+      
+      if (err.response?.status === 401) {
+        errorMessage = 'Authentication failed. Please log in again.';
+      } else if (err.response?.status === 403) {
+        errorMessage = 'You do not have permission to upload images.';
+      } else if (err.response?.status === 404) {
+        // Check for session-related errors
+        const responseMessage = err.response?.data?.message || err.message || '';
+        if (responseMessage.toLowerCase().includes('session')) {
+          errorMessage = 'No active session found. Please contact administrator to activate a session.';
+        } else {
+          errorMessage = responseMessage || 'Resource not found.';
+        }
+      } else if (err.response?.status === 400) {
+        const responseMessage = err.response?.data?.message || err.message || '';
+        errorMessage = responseMessage || 'Invalid request. Please check your input.';
+      } else if (err.response?.status === 413) {
+        errorMessage = 'Image file is too large. Please select a smaller file (max 10MB).';
+      } else if (err.response?.status === 415) {
+        errorMessage = 'Invalid file type. Please upload a valid image file (JPG, PNG, etc.).';
+      } else if (err.response?.status >= 500) {
+        errorMessage = 'Server error. Please try again later or contact support.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      alert(errorMessage);
     } finally {
       setUploadingImage(false);
     }
@@ -608,23 +669,28 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
         const studentsData = await TeacherService.getStudentsByClass(parseInt(cls.id));
         for (const student of studentsData) {
           if (student.panNumber) {
-            const scores = await TeacherService.getStudentScores(student.panNumber);
-            scores.forEach((score: any) => {
-              results.push({
-                id: score.id?.toString() || '',
-                studentName: student.name || '',
-                studentClass: cls.className,
-                section: cls.section,
-                subject: score.subjectName || '',
-                examType: score.examType || '',
-                examDate: score.examDate || '',
-                marks: score.marksObtained || 0,
-                totalMarks: score.totalMarks || 100,
-                percentage: score.percentage || 0,
-                grade: score.grade || '',
-                remarks: score.remarks || undefined
+            try {
+              const scores = await TeacherService.getStudentScores(student.panNumber);
+              scores.forEach((score: any) => {
+                results.push({
+                  id: score.id?.toString() || '',
+                  studentName: student.name || '',
+                  studentClass: cls.className,
+                  section: cls.section,
+                  subject: score.subjectName || '',
+                  examType: score.examType || '',
+                  examDate: score.examDate || '',
+                  marks: score.marksObtained || 0,
+                  totalMarks: score.totalMarks || 100,
+                  percentage: score.percentage || 0,
+                  grade: score.grade || '',
+                  remarks: score.remarks || undefined
+                });
               });
-            });
+            } catch (scoreErr: any) {
+              // Silently skip students with no scores instead of throwing error
+              console.log(`No scores found for student ${student.panNumber}`);
+            }
           }
         }
       }
@@ -1671,10 +1737,10 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                       💬 Your Response:
                     </label>
                     <textarea
-                      value={responseText[query.id!] || ''}
+                      value={responseText[query.teacherId!] || ''}
                       onChange={(e) => {
-                        if (query.id) {
-                          setResponseText({ ...responseText, [query.id]: e.target.value });
+                        if (query.teacherId) {
+                          setResponseText({ ...responseText, [query.teacherId]: e.target.value });
                         }
                       }}
                       placeholder="Type your response to the student..."
@@ -1700,30 +1766,30 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                     />
                     <button 
                       onClick={() => {
-                        if (query.id && responseText[query.id]?.trim()) {
-                          handleRespondToQuery(query.id);
+                        if (query.teacherId && responseText[query.teacherId]?.trim()) {
+                          handleRespondToQuery(query.teacherId);
                         }
                       }}
-                      disabled={!query.id || !responseText[query.id]?.trim()}
+                      disabled={!query.teacherId || !responseText[query.teacherId]?.trim()}
                       style={{ 
-                        backgroundColor: (!query.id || !responseText[query.id]?.trim()) ? '#d1d5db' : '#10b981',
+                        backgroundColor: (!query.teacherId || !responseText[query.teacherId]?.trim()) ? '#d1d5db' : '#10b981',
                         color: 'white', 
                         padding: '0.75rem 1.5rem', 
                         borderRadius: '8px',
                         border: 'none',
                         fontSize: '0.95rem',
                         fontWeight: '600',
-                        cursor: (!query.id || !responseText[query.id]?.trim()) ? 'not-allowed' : 'pointer',
+                        cursor: (!query.teacherId || !responseText[query.teacherId]?.trim()) ? 'not-allowed' : 'pointer',
                         transition: 'all 0.2s',
-                        boxShadow: (!query.id || !responseText[query.id]?.trim()) ? 'none' : '0 2px 4px rgba(16, 185, 129, 0.3)'
+                        boxShadow: (!query.teacherId || !responseText[query.teacherId]?.trim()) ? 'none' : '0 2px 4px rgba(16, 185, 129, 0.3)'
                       }}
                       onMouseOver={(e) => {
-                        if (query.id && responseText[query.id]?.trim()) {
+                        if (query.teacherId && responseText[query.teacherId]?.trim()) {
                           e.currentTarget.style.backgroundColor = '#059669';
                         }
                       }}
                       onMouseOut={(e) => {
-                        if (query.id && responseText[query.id]?.trim()) {
+                        if (query.teacherId && responseText[query.teacherId]?.trim()) {
                           e.currentTarget.style.backgroundColor = '#10b981';
                         }
                       }}
@@ -2874,17 +2940,56 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
               )}
             </div>
 
+            {!activeSessionId && !sessionLoading && (
+              <div style={{
+                padding: '1rem',
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '6px',
+                marginBottom: '1rem',
+                color: '#991b1b'
+              }}>
+                ⚠️ No active session found. Please contact administrator to activate a session before uploading.
+              </div>
+            )}
+
+            {sessionLoading && (
+              <div style={{
+                padding: '1rem',
+                backgroundColor: '#fef9e7',
+                border: '1px solid #fad7a0',
+                borderRadius: '6px',
+                marginBottom: '1rem',
+                color: '#7d6608'
+              }}>
+                🔄 Loading session information...
+              </div>
+            )}
+
+            {activeSessionId && (
+              <div style={{
+                padding: '1rem',
+                backgroundColor: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: '6px',
+                marginBottom: '1rem',
+                color: '#166534'
+              }}>
+                ✓ Active session available (ID: {activeSessionId})
+              </div>
+            )}
+
             <button
               onClick={handleImageUpload}
-              disabled={!selectedFile || uploadingImage}
+              disabled={!selectedFile || uploadingImage || !activeSessionId || sessionLoading}
               style={{
                 padding: '0.75rem 2rem',
-                backgroundColor: uploadingImage ? '#9ca3af' : '#10b981',
+                backgroundColor: (uploadingImage || !activeSessionId || sessionLoading) ? '#9ca3af' : '#10b981',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: '500',
-                cursor: uploadingImage || !selectedFile ? 'not-allowed' : 'pointer',
+                cursor: (uploadingImage || !selectedFile || !activeSessionId || sessionLoading) ? 'not-allowed' : 'pointer',
                 fontSize: '1rem'
               }}
             >

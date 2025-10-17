@@ -642,11 +642,15 @@
 
 .main-content {
   flex: 1;
-  padding: 0 20px 20px 20px;
+  padding: 20px;
   background-color: #f0f2f5;
   margin: 0 auto;
   width: 100%;
   max-width: 1200px;
+}
+
+.main-content > section:first-child {
+  margin-top: 0;
 }
 
 .section-icon {

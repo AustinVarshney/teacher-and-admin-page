@@ -7,6 +7,8 @@ import ClassManagement from './ClassManagement';
 import EventManagement from './EventManagement';
 import SubjectManagement from './SubjectManagement';
 import FeeManagement from './FeeManagement';
+import TimetableManagement from './TimetableManagement';
+import HolidayManagement from './HolidayManagement';
 import { FeeService } from '../../services/feeService';
 import AdminService, { StudentResponse, TeacherResponse, NonTeachingStaffResponse, ClassInfoResponse } from '../../services/adminService';
 import StudentService from '../../services/studentService';
@@ -14,8 +16,8 @@ import TransferCertificateService from '../../services/transferCertificateServic
 import NotificationService, { BroadcastMessageDto } from '../../services/notificationService';
 import LeaveService, { StaffLeaveResponse } from '../../services/leaveService';
 import QueryService, { TeacherQueryResponse } from '../../services/queryService';
-import TeacherAssignment from './TeacherAssignment.tsx';
 import galleryService from '../../services/galleryService';
+import { SessionService } from '../../services/sessionService';
 import { 
   Student, 
   Message,
@@ -92,6 +94,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [imageTitle, setImageTitle] = useState('');
   const [imageDescription, setImageDescription] = useState('');
   const [showGalleryUpload, setShowGalleryUpload] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
+
+  // Fetch active session
+  useEffect(() => {
+    const fetchActiveSession = async () => {
+      try {
+        const session = await SessionService.getActiveSession();
+        if (session && session.id) {
+          setActiveSessionId(session.id);
+        }
+      } catch (err) {
+        console.error('Failed to fetch active session:', err);
+      }
+    };
+    fetchActiveSession();
+  }, []);
 
   // Save active tab to localStorage whenever it changes
   useEffect(() => {
@@ -1623,6 +1641,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       return;
     }
 
+    if (!activeSessionId) {
+      alert('No active session found. Please contact administrator to activate a session.');
+      return;
+    }
+
     try {
       setUploadingImage(true);
       
@@ -1635,7 +1658,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         uploadedByType: 'ADMIN',
         uploadedById: adminData.id || 1,
         uploadedByName: adminData.name || 'Admin',
-        sessionId: 1
+        sessionId: activeSessionId
       });
 
       alert('Image uploaded successfully!');
@@ -1650,7 +1673,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       fetchGalleryImages();
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      alert(error.message || 'Failed to upload image');
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to upload image';
+      
+      if (error.response?.status === 401) {
+        errorMessage = 'Authentication failed. Please log in again.';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'You do not have permission to upload images.';
+      } else if (error.response?.status === 404) {
+        // Check for session-related errors
+        const responseMessage = error.response?.data?.message || error.message || '';
+        if (responseMessage.toLowerCase().includes('session')) {
+          errorMessage = 'No active session found. Please contact administrator to activate a session.';
+        } else {
+          errorMessage = responseMessage || 'Resource not found.';
+        }
+      } else if (error.response?.status === 400) {
+        const responseMessage = error.response?.data?.message || error.message || '';
+        errorMessage = responseMessage || 'Invalid request. Please check your input.';
+      } else if (error.response?.status === 413) {
+        errorMessage = 'Image file is too large. Please select a smaller file (max 10MB).';
+      } else if (error.response?.status === 415) {
+        errorMessage = 'Invalid file type. Please upload a valid image file (JPG, PNG, etc.).';
+      } else if (error.response?.status >= 500) {
+        errorMessage = 'Server error. Please try again later or contact support.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(errorMessage);
     } finally {
       setUploadingImage(false);
     }
@@ -1872,10 +1924,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     💬 Provide Your Response:
                   </label>
                   <textarea
-                    value={queryResponseText[query.id!] || ''}
+                    value={queryResponseText[query.adminId!] || ''}
                     onChange={(e) => {
-                      if (query.id) {
-                        setQueryResponseText({ ...queryResponseText, [query.id]: e.target.value });
+                      if (query.adminId) {
+                        setQueryResponseText({ ...queryResponseText, [query.adminId]: e.target.value });
                       }
                     }}
                     placeholder="Type your detailed response to help the teacher..."
@@ -1903,34 +1955,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <button 
                       onClick={() => {
-                        if (query.id && queryResponseText[query.id]?.trim()) {
-                          handleRespondToTeacherQuery(query.id);
+                        if (query.adminId && queryResponseText[query.adminId]?.trim()) {
+                          handleRespondToTeacherQuery(query.adminId);
                         }
                       }}
-                      disabled={!query.id || !queryResponseText[query.id]?.trim()}
+                      disabled={!query.adminId || !queryResponseText[query.adminId]?.trim()}
                       style={{ 
-                        backgroundColor: (!query.id || !queryResponseText[query.id]?.trim()) ? '#9ca3af' : '#10b981',
+                        backgroundColor: (!query.adminId || !queryResponseText[query.adminId]?.trim()) ? '#9ca3af' : '#10b981',
                         color: 'white', 
                         padding: '0.875rem 2rem', 
                         borderRadius: '8px',
                         border: 'none',
                         fontSize: '1rem',
                         fontWeight: '700',
-                        cursor: (!query.id || !queryResponseText[query.id]?.trim()) ? 'not-allowed' : 'pointer',
+                        cursor: (!query.adminId || !queryResponseText[query.adminId]?.trim()) ? 'not-allowed' : 'pointer',
                         transition: 'all 0.2s',
-                        boxShadow: (!query.id || !queryResponseText[query.id]?.trim()) ? 'none' : '0 2px 4px rgba(16, 185, 129, 0.4)',
+                        boxShadow: (!query.adminId || !queryResponseText[query.adminId]?.trim()) ? 'none' : '0 2px 4px rgba(16, 185, 129, 0.4)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.5rem'
                       }}
                       onMouseOver={(e) => {
-                        if (query.id && queryResponseText[query.id]?.trim()) {
+                        if (query.adminId && queryResponseText[query.adminId]?.trim()) {
                           e.currentTarget.style.backgroundColor = '#059669';
                           e.currentTarget.style.transform = 'scale(1.02)';
                         }
                       }}
                       onMouseOut={(e) => {
-                        if (query.id && queryResponseText[query.id]?.trim()) {
+                        if (query.adminId && queryResponseText[query.adminId]?.trim()) {
                           e.currentTarget.style.backgroundColor = '#10b981';
                           e.currentTarget.style.transform = 'scale(1)';
                         }
@@ -1939,13 +1991,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                       <span>📤</span>
                       <span>Send Response</span>
                     </button>
-                    {queryResponseText[query.id!]?.trim() && (
+                    {queryResponseText[query.adminId!]?.trim() && (
                       <span style={{ 
                         fontSize: '0.85rem', 
                         color: '#6b7280',
                         fontWeight: '500'
                       }}>
-                        {queryResponseText[query.id!].length} characters
+                        {queryResponseText[query.adminId!].length} characters
                       </span>
                     )}
                   </div>
@@ -2297,7 +2349,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       case 'events':
         return <EventManagement />;
       case 'timetable':
-        return <TeacherAssignment />;
+        return <TimetableManagement />;
       case 'teacher-queries':
         return renderTeacherQueries();
       case 'staff-leaves':
@@ -2306,6 +2358,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         return renderInbox();
       case 'gallery':
         return renderGallery();
+      case 'holidays':
+        return <HolidayManagement />;
       default:
         return renderOverview();
     }
@@ -2417,6 +2471,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               onClick={() => setActiveTab('gallery')}
             >
               🖼️ Gallery
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'holidays' ? 'active' : ''}`}
+              onClick={() => setActiveTab('holidays')}
+            >
+              📅 Holidays
             </button>
           </nav>
         </aside>

@@ -4,6 +4,7 @@ import './TCForm.css';
 import StudentService from '../../services/studentService';
 import EventService from '../../services/eventService';
 import TimetableService from '../../services/timetableService';
+import HolidayService from '../../services/holidayService';
 import { FeeService } from '../../services/feeService';
 import { AttendanceService } from '../../services/attendanceService';
 import TransferCertificateService from '../../services/transferCertificateService';
@@ -20,7 +21,7 @@ interface StudentDashboardProps {
 }
 
 type AttendanceSummary = { present: number; absent: number; };
-type Holiday = { id: string; date: string; name: string; };
+type Holiday = { id: string; date: string; name: string; startDate?: string; endDate?: string; };
 type TimetableEntry = { id: string; day: string; period: number; start: string; end: string; subject: string; teacher: string; };
 type EventItem = { id: string; startDate: string; endDate: string; name: string; description?: string; type: 'sports' | 'cultural' | 'academic' | 'meeting'; };
 type FeeStatus = { total: number; paid: number; pending: number; status: 'paid' | 'pending' | 'overdue'; };
@@ -58,6 +59,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
   const [resultsLoading, setResultsLoading] = useState(false);
   const [videoLectures, setVideoLectures] = useState<VideoLectureType[]>([]);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  
+  // Attendance month selection state
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
 
   // Transfer Certificate state
   const [tcRequests, setTcRequests] = useState<TransferCertificateRequest[]>([]);
@@ -123,7 +129,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
               const transformedTimetable = timetableData.map((entry: any, index: number) => ({
                 id: entry.id?.toString() || `t${index}`,
                 day: entry.day || entry.dayOfWeek || 'Mon',
-                period: index + 1,
+                period: entry.period || (index + 1), // Use actual period from backend
                 start: entry.startTime || '08:00',
                 end: entry.endTime || '08:45',
                 subject: entry.subjectName || entry.subject || 'Subject',
@@ -208,6 +214,27 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         } catch (eventsError) {
           console.warn('No events data available:', eventsError);
           setEvents([]);
+        }
+
+        // Fetch holidays from database
+        try {
+          const holidaysData = await HolidayService.getAllHolidays();
+          
+          // Transform holidays data to match component format
+          // Backend returns: { id, startDate, endDate, occasion, sessionId }
+          // Frontend expects: { id, date, name, startDate, endDate }
+          const transformedHolidays = holidaysData.map((holiday: any) => ({
+            id: holiday.id?.toString() || `h${Math.random()}`,
+            date: holiday.startDate || new Date().toISOString().split('T')[0],
+            startDate: holiday.startDate || new Date().toISOString().split('T')[0],
+            endDate: holiday.endDate || holiday.startDate || new Date().toISOString().split('T')[0],
+            name: holiday.occasion || 'Holiday',
+          }));
+          
+          setHolidays(transformedHolidays);
+        } catch (holidaysError) {
+          console.warn('No holidays data available:', holidaysError);
+          setHolidays([]);
         }
 
         // Fetch fee catalog for current student
@@ -376,12 +403,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
     return { present: totalPresent, absent: totalAbsent };
   }, [attendanceData]);
 
-  const holidays: Holiday[] = [
-    { id: 'h1', date: '2025-01-26', name: 'Republic Day' },
-    { id: 'h2', date: '2025-03-17', name: 'Holi' },
-    { id: 'h3', date: '2025-08-15', name: 'Independence Day' },
-  ];
-
   // Mock timetable data (COMMENTED OUT - Now using API data)
   // const timetable: TimetableEntry[] = [
   //   { id: 't1', day: 'Mon', period: 1, start: '08:00', end: '08:45', subject: 'Mathematics', teacher: 'Dr. Verma' },
@@ -497,8 +518,33 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
   }, [attendance.present, attendance.absent]);
 
   // Attendance calendar - Use real data from API
-  const holidayDates = new Set<string>(holidays.map(h => h.date));
   const formatKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  
+  // Build holiday dates set to include all dates in the range (startDate to endDate)
+  const holidayDates = useMemo(() => {
+    const dates = new Set<string>();
+    
+    holidays.forEach(h => {
+      const startDate = new Date(h.startDate || h.date);
+      const endDate = new Date(h.endDate || h.startDate || h.date);
+      
+      // Validate dates
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        console.warn('Invalid holiday date:', h);
+        return;
+      }
+      
+      // Add all dates in the range (inclusive)
+      const currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        const dateStr = formatKey(currentDate);
+        dates.add(dateStr);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    });
+    
+    return dates;
+  }, [holidays]);
   
   const buildAttendanceSets = () => {
     const present = new Set<string>();
@@ -1168,70 +1214,137 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                       </tr>
                     </thead>
                     <tbody>
-                      {weekDays.map((day, dayIdx) => (
-                        <tr key={day} style={{ 
-                          backgroundColor: dayIdx % 2 === 0 ? '#f9fafb' : 'white' 
-                        }}>
-                          <td style={{ 
-                            padding: '1rem', 
-                            border: '1px solid #ddd',
-                            fontWeight: '600',
-                            backgroundColor: '#e5e7eb',
-                            textAlign: 'center'
+                      {weekDays.map((day, dayIdx) => {
+                        // Get the date for this day of the current week
+                        const today = new Date();
+                        const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+                        const daysOfWeek = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+                        const targetDayIndex = daysOfWeek.indexOf(day);
+                        
+                        // Calculate the date for this weekday
+                        const daysFromToday = targetDayIndex - currentDay;
+                        const targetDate = new Date(today);
+                        targetDate.setDate(today.getDate() + daysFromToday);
+                        targetDate.setHours(0, 0, 0, 0);
+                        
+                        // Check if this day falls within any holiday range
+                        const matchingHoliday = holidays.find(holiday => {
+                          if (!holiday.startDate || !holiday.endDate) return false;
+                          
+                          const holidayStart = new Date(holiday.startDate);
+                          holidayStart.setHours(0, 0, 0, 0);
+                          const holidayEnd = new Date(holiday.endDate);
+                          holidayEnd.setHours(0, 0, 0, 0);
+                          
+                          return targetDate >= holidayStart && targetDate <= holidayEnd;
+                        });
+                        
+                        const isHoliday = !!matchingHoliday;
+                        
+                        return (
+                          <tr key={day} style={{ 
+                            backgroundColor: isHoliday 
+                              ? '#fef2f2' 
+                              : (dayIdx % 2 === 0 ? '#f9fafb' : 'white')
                           }}>
-                            {day}
-                          </td>
-                          {periods.map((period, periodIdx) => {
-                            if (period === 'LUNCH') {
+                            <td style={{ 
+                              padding: '1rem', 
+                              border: '1px solid #ddd',
+                              fontWeight: '600',
+                              backgroundColor: isHoliday ? '#fee2e2' : '#e5e7eb',
+                              textAlign: 'center',
+                              position: 'relative'
+                            }}>
+                              {isHoliday && (
+                                <span style={{ 
+                                  position: 'absolute', 
+                                  left: '0.5rem', 
+                                  top: '50%', 
+                                  transform: 'translateY(-50%)',
+                                  fontSize: '1.2rem'
+                                }}>
+                                  🎉
+                                </span>
+                              )}
+                              {day}
+                              {isHoliday && (
+                                <div style={{
+                                  fontSize: '0.75rem',
+                                  color: '#991b1b',
+                                  marginTop: '0.25rem'
+                                }}>
+                                  Holiday
+                                </div>
+                              )}
+                            </td>
+                            {periods.map((period, periodIdx) => {
+                              if (period === 'LUNCH') {
+                                return (
+                                  <td key={periodIdx} style={{ 
+                                    padding: '1rem', 
+                                    border: '1px solid #ddd',
+                                    backgroundColor: isHoliday ? '#fed7d7' : '#fef3c7',
+                                    textAlign: 'center',
+                                    fontWeight: '600',
+                                    color: '#92400e'
+                                  }}>
+                                    🍽️ LUNCH BREAK
+                                  </td>
+                                );
+                              }
+                              
+                              const slot = timetableGrid[day][period as number];
                               return (
                                 <td key={periodIdx} style={{ 
-                                  padding: '1rem', 
+                                  padding: '0.75rem', 
                                   border: '1px solid #ddd',
-                                  backgroundColor: '#fef3c7',
                                   textAlign: 'center',
-                                  fontWeight: '600',
-                                  color: '#92400e'
+                                  backgroundColor: isHoliday 
+                                    ? '#fecaca' 
+                                    : (period === 8 ? '#f3e8ff' : 'inherit'),
+                                  verticalAlign: 'middle',
+                                  position: 'relative'
                                 }}>
-                                  🍽️ LUNCH BREAK
+                                  {isHoliday ? (
+                                    <div style={{
+                                      color: '#991b1b',
+                                      fontWeight: '600',
+                                      fontSize: '0.95rem'
+                                    }}>
+                                      <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>
+                                        🎉
+                                      </div>
+                                      <div style={{ fontSize: '0.85rem' }}>
+                                        {matchingHoliday?.name}
+                                      </div>
+                                    </div>
+                                  ) : slot ? (
+                                    <div>
+                                      <div style={{ 
+                                        fontWeight: '600', 
+                                        color: '#1f2937',
+                                        marginBottom: '0.25rem'
+                                      }}>
+                                        {slot.subject}
+                                      </div>
+                                      <div style={{ 
+                                        fontSize: '0.85rem', 
+                                        color: '#6b7280'
+                                      }}>
+                                        {slot.teacher}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>
+                                      -
+                                    </div>
+                                  )}
                                 </td>
                               );
-                            }
-                            
-                            const slot = timetableGrid[day][period as number];
-                            return (
-                              <td key={periodIdx} style={{ 
-                                padding: '0.75rem', 
-                                border: '1px solid #ddd',
-                                textAlign: 'center',
-                                backgroundColor: period === 8 ? '#f3e8ff' : 'inherit',
-                                verticalAlign: 'middle'
-                              }}>
-                                {slot ? (
-                                  <div>
-                                    <div style={{ 
-                                      fontWeight: '600', 
-                                      color: '#1f2937',
-                                      marginBottom: '0.25rem'
-                                    }}>
-                                      {slot.subject}
-                                    </div>
-                                    <div style={{ 
-                                      fontSize: '0.85rem', 
-                                      color: '#6b7280'
-                                    }}>
-                                      {slot.teacher}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>
-                                    -
-                                  </div>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
+                            })}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
 
@@ -1320,16 +1433,69 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         })()}
 
         {activeTab === 'attendance' && (() => {
-          const now = new Date();
-          const year = now.getFullYear();
-          const monthIndex = now.getMonth();
-          const monthName = now.toLocaleString('default', { month: 'long' });
+          const year = selectedYear;
+          const monthIndex = selectedMonth;
+          const monthName = new Date(year, monthIndex).toLocaleString('default', { month: 'long' });
           const weeks = buildWeeks(year, monthIndex);
           const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
           const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          
+          // Generate year options (current year and 2 years back)
+          const currentYear = new Date().getFullYear();
+          const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
+          const monthOptions = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+          ];
+          
           return (
             <section className="attendance-section">
-              <SectionHeader icon="🗓️" title={`Attendance — ${monthName} ${year}`} />
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                marginBottom: '1.5rem',
+                flexWrap: 'wrap',
+                gap: '1rem'
+              }}>
+                <SectionHeader icon="🗓️" title={`Attendance — ${monthName} ${year}`} />
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <select 
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      backgroundColor: 'white',
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                      outline: 'none'
+                    }}
+                  >
+                    {monthOptions.map((month, idx) => (
+                      <option key={idx} value={idx}>{month}</option>
+                    ))}
+                  </select>
+                  <select 
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      backgroundColor: 'white',
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                      outline: 'none'
+                    }}
+                  >
+                    {yearOptions.map((yr) => (
+                      <option key={yr} value={yr}>{yr}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div className="calendar">
                 <table className="calendar-table" aria-label="Attendance calendar">
                   <thead>
@@ -1439,22 +1605,93 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         {activeTab === 'holidays' && (
           <section className="holidays-section">
             <SectionHeader icon="🎉" title="Holiday List" />
-            <table className="holidays-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Name</th>
-                </tr>
-              </thead>
-              <tbody>
-                {holidays.map(h => (
-                  <tr key={h.id}>
-                    <td>{h.date}</td>
-                    <td>{h.name}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '2rem' }}>Loading holidays...</div>
+            ) : holidays.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                <p>📅 No holidays scheduled yet.</p>
+                <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Holiday calendar will be updated by administration.</p>
+              </div>
+            ) : (
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: '1.5rem',
+                marginTop: '1rem'
+              }}>
+                {holidays
+                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .map(h => {
+                    const startDate = new Date(h.startDate || h.date);
+                    const endDate = new Date(h.endDate || h.date);
+                    const isSingleDay = startDate.getTime() === endDate.getTime();
+                    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    return (
+                      <div key={h.id} style={{
+                        padding: '1.5rem',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        borderRadius: '12px',
+                        color: 'white',
+                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                        transition: 'transform 0.2s',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
+                      onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                      >
+                        <div style={{ 
+                          fontSize: isSingleDay ? '2.5rem' : '1.5rem',
+                          marginBottom: '0.5rem',
+                          textAlign: 'center',
+                          fontWeight: '600'
+                        }}>
+                          {isSingleDay ? (
+                            startDate.getDate()
+                          ) : (
+                            <div>
+                              <div>{startDate.getDate()} - {endDate.getDate()}</div>
+                              <div style={{ fontSize: '0.7em', opacity: 0.9, marginTop: '0.25rem' }}>
+                                ({daysDiff + 1} days)
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ 
+                          fontSize: '0.9rem',
+                          textAlign: 'center',
+                          opacity: 0.9,
+                          marginBottom: '0.75rem'
+                        }}>
+                          {startDate.toLocaleDateString('en-US', { 
+                            month: 'long', 
+                            year: 'numeric' 
+                          })}
+                        </div>
+                        <div style={{ 
+                          fontSize: '1.1rem',
+                          fontWeight: '600',
+                          textAlign: 'center'
+                        }}>
+                          {h.name}
+                        </div>
+                        <div style={{ 
+                          fontSize: '0.85rem',
+                          textAlign: 'center',
+                          marginTop: '0.5rem',
+                          opacity: 0.8
+                        }}>
+                          {isSingleDay ? (
+                            startDate.toLocaleDateString('en-US', { weekday: 'long' })
+                          ) : (
+                            `${startDate.toLocaleDateString('en-US', { weekday: 'short' })} - ${endDate.toLocaleDateString('en-US', { weekday: 'short' })}`
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </section>
         )}
 
@@ -2097,13 +2334,34 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 <li>Provide a valid reason for the transfer.</li>
                 <li>Once submitted, you can track the status of your request below.</li>
               </ul>
-              <button 
-                className="tc-btn" 
-                onClick={() => setShowTCForm(true)}
-                disabled={tcLoading}
-              >
-                {tcLoading ? 'Processing...' : 'Request Transfer Certificate'}
-              </button>
+              {/* Check if there's already a pending or processing request */}
+              {(() => {
+                const hasPendingRequest = tcRequests.some(req => 
+                  req.status === 'PENDING' || 
+                  req.status === 'FORWARDED_TO_TEACHER'
+                );
+                
+                return hasPendingRequest ? (
+                  <div style={{
+                    padding: '12px 16px',
+                    backgroundColor: '#fff3cd',
+                    color: '#856404',
+                    borderRadius: '6px',
+                    marginTop: '16px',
+                    border: '1px solid #ffeeba'
+                  }}>
+                    ⏳ You already have a pending transfer certificate request. Please wait for it to be processed.
+                  </div>
+                ) : (
+                  <button 
+                    className="tc-btn" 
+                    onClick={() => setShowTCForm(true)}
+                    disabled={tcLoading}
+                  >
+                    {tcLoading ? 'Processing...' : 'Request Transfer Certificate'}
+                  </button>
+                );
+              })()}
             </div>
 
             {/* TC Request Form Modal */}

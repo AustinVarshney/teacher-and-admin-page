@@ -109,11 +109,21 @@ export class SessionService {
 
   // Get active session
   static async getActiveSession(): Promise<SessionResponse | null> {
+    // try {
+    //   const sessions = await this.getAllSessions();
+    //   return sessions.find(session => session.active) || null;
+    // } catch (error: any) {
+    //   console.error('Failed to get active session:', error);
+    //   return null;
+    // }
     try {
       const sessions = await this.getAllSessions();
-      return sessions.find(session => session.active) || null;
+      console.log("All sessions fetched:", sessions);
+      const active = sessions.find(s => s.active);
+      if (!active) console.warn("⚠️ No active session found in response");
+      return active || null;
     } catch (error: any) {
-      console.error('Failed to get active session:', error);
+      console.error("🔥 getActiveSession failed:", error);
       return null;
     }
   }

@@ -126,10 +126,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     fetchGalleryImages();
   }, []);
   
-  // Load TC requests when switching to TC tab
+  // Load TC requests when switching to TC tab (no auto-refresh)
   useEffect(() => {
-    if (activeTab === 'tc-requests') {
-      loadTCRequests();
+    if (activeTab === 'transfer-certificates') {
+      loadTCRequests(false); // Load with alerts on errors
     }
   }, [activeTab]);
 
@@ -189,14 +189,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   };
 
   // Transfer Certificate helper functions
-  const loadTCRequests = async () => {
+  const loadTCRequests = async (silent = false) => {
     try {
       setTcLoading(true);
       const requests = await TransferCertificateService.getAllRequests('PENDING');
       setTcRequests(requests || []);
     } catch (error: any) {
       console.error('Error loading TC requests:', error);
-      alert(error.message || 'Failed to load TC requests');
+      // Only show alert if not a silent refresh (i.e., not from polling)
+      if (!silent) {
+        alert(error.message || 'Failed to load TC requests');
+      }
     } finally {
       setTcLoading(false);
     }
@@ -914,15 +917,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const renderTransferCertificates = () => {
     return (
       <div className="transfer-certificates-section">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div style={{ marginBottom: '20px' }}>
           <h3>Transfer Certificate Requests</h3>
-          <button 
-            className="action-btn"
-            onClick={loadTCRequests}
-            style={{ padding: '8px 16px' }}
-          >
-            🔄 Refresh
-          </button>
         </div>
 
         {tcLoading ? (

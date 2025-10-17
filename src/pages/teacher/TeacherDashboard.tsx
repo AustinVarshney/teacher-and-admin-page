@@ -15,6 +15,7 @@ import MarkAttendance from './MarkAttendance';
 import NotificationService, { NotificationDto } from '../../services/notificationService';
 import galleryService from '../../services/galleryService';
 import { SessionService } from '../../services/sessionService';
+import HolidayService, { Holiday } from '../../services/holidayService';
 
 interface TeacherDashboardProps {
   onLogout: () => void;
@@ -39,6 +40,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
   const [error, setError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<NotificationDto[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
 
   // New states for queries and leaves
   const [studentQueries, setStudentQueries] = useState<StudentQueryResponse[]>([]);
@@ -101,11 +103,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
       try {
         setSessionLoading(true);
         const session = await SessionService.getActiveSession();
-        console.log("--------------------------------------------------------------------------")
-        console.log('Active session fetched:', session);
         if (session && session.id) {
           setActiveSessionId(session.id);
-          console.log('Active session ID set to:', session.id);
         } else {
           console.warn('No active session found');
         }
@@ -116,6 +115,19 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
       }
     };
     fetchActiveSession();
+  }, []);
+
+  // Fetch holidays
+  useEffect(() => {
+    const fetchHolidays = async () => {
+      try {
+        const holidayData = await HolidayService.getAllHolidays();
+        setHolidays(holidayData);
+      } catch (err) {
+        console.error('Error fetching holidays:', err);
+      }
+    };
+    fetchHolidays();
   }, []);
 
   // Fetch student queries for teacher
@@ -524,18 +536,18 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
       const transformedTeacher: Teacher = {
         id: teacherData.id?.toString() || '',
         name: teacherData.name || '',
-        mobileNumber: teacherData.contactNumber || teacherData.mobileNumber || 'N/A',
+        mobileNumber: teacherData.contactNumber || teacherData.mobileNumber || '',
         email: teacherData.email || '',
-        qualification: teacherData.qualification || 'N/A',
+        qualification: teacherData.qualification || '',
         designation: teacherData.designation || 'Teacher',
         currentSchool: teacherData.currentSchool || 'SLMS School',
         profilePhoto: '👨‍🏫',
         personalInfo: {
-          address: teacherData.address || 'N/A',
-          emergencyContact: teacherData.emergencyContact || teacherData.contactNumber || 'N/A',
-          bloodGroup: teacherData.bloodGroup || 'N/A',
-          dateOfBirth: teacherData.dateOfBirth || 'N/A',
-          joiningDate: teacherData.joiningDate || 'N/A'
+          address: teacherData.address || '',
+          emergencyContact: teacherData.emergencyContact || teacherData.contactNumber || '',
+          bloodGroup: teacherData.bloodGroup || '',
+          dateOfBirth: teacherData.dateOfBirth || '',
+          joiningDate: teacherData.joiningDate || ''
         }
       };
       setTeacher(transformedTeacher);
@@ -543,16 +555,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
       // Fetch assigned classes from timetable
       try {
         const timetableData = await TeacherService.getTeacherTimeTable();
-        console.log('Raw timetable data from backend:', timetableData);
         
         const transformedClasses: AssignedClass[] = timetableData.map((item: any) => {
-          console.log('Mapping timetable item:', {
-            timetableId: item.id,
-            classId: item.classId,
-            className: item.className,
-            section: item.section
-          });
-          
           return {
             id: item.id?.toString() || '',
             classId: item.classId?.toString() || '', // Store actual class ID
@@ -567,7 +571,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
           };
         });
         
-        console.log('Transformed classes:', transformedClasses);
         setAssignedClasses(transformedClasses);
 
         // Fetch student counts for all classes
@@ -577,7 +580,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
             try {
               const students = await TeacherService.getStudentsByClass(parseInt(cls.classId));
               counts[cls.classId] = students.length;
-              console.log(`Class ${cls.className}-${cls.section} (ID: ${cls.classId}) has ${students.length} students`);
+              // console.log(`Class ${cls.className}-${cls.section} (ID: ${cls.classId}) has ${students.length} students`);
             } catch (err) {
               console.warn(`Failed to fetch students for class ${cls.classId}:`, err);
               counts[cls.classId] = 0;
@@ -585,11 +588,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
           }
         }
         setStudentCounts(counts);
-        console.log('All student counts:', counts);
 
         // Fetch students for the first class (if any)
         if (transformedClasses.length > 0 && transformedClasses[0].classId) {
-          console.log('Fetching students for classId:', transformedClasses[0].classId);
           await fetchStudentsForClass(transformedClasses[0].classId);
         }
       } catch (timetableError: any) {
@@ -613,23 +614,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
     }
     
     try {
-      console.log('Fetching students for class ID:', classId);
       const studentsData = await TeacherService.getStudentsByClass(parseInt(classId));
-      console.log('Students data received from backend:', studentsData);
-      console.log('First student raw data:', studentsData[0]);
       
       const transformedStudents: ClassStudent[] = studentsData.map((student: any) => {
-        console.log('Mapping student:', {
-          panNumber: student.panNumber,
-          name: student.name,
-          parentName: student.parentName,
-          mobileNumber: student.mobileNumber,
-          currentClass: student.currentClass,
-          section: student.section,
-          feeStatus: student.feeStatus,
-          classRollNumber: student.classRollNumber
-        });
-        
         return {
           id: student.panNumber || student.id?.toString() || '',
           name: student.name || 'N/A',
@@ -651,8 +638,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
         };
       });
       
-      console.log('Transformed students:', transformedStudents);
-      console.log('Total students fetched:', transformedStudents.length);
       setClassStudents(transformedStudents);
     } catch (err: any) {
       console.error('Error fetching students for classId', classId, ':', err);
@@ -943,7 +928,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                 }}>
                   {teacher.designation}
                 </span>
-                {teacher.qualification && teacher.qualification !== 'N/A' && (
+                {teacher.qualification && teacher.qualification !== 'N/A' && teacher.qualification.trim() !== '' && (
                   <span style={{
                     background: 'rgba(255, 255, 255, 0.25)',
                     padding: '0.5rem 1rem',
@@ -1000,27 +985,29 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
               }}>{teacher.email}</span>
             </div>
             
-            <div className="info-item" style={{
-              background: 'rgba(255, 255, 255, 0.15)',
-              padding: '1.25rem',
-              borderRadius: '12px',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              transition: 'transform 0.2s, background 0.2s'
-            }}>
-              <label style={{ 
-                fontSize: '0.85rem', 
-                opacity: 0.7, 
-                display: 'block',
-                marginBottom: '0.5rem',
-                fontWeight: '400',
-                letterSpacing: '0.5px',
-                color: 'white'
-              }}>📱 MOBILE NUMBER</label>
-              <span style={{ fontSize: '1rem', fontWeight: '600' }}>{teacher.mobileNumber}</span>
-            </div>
+            {teacher.mobileNumber && teacher.mobileNumber !== 'N/A' && teacher.mobileNumber.trim() !== '' && (
+              <div className="info-item" style={{
+                background: 'rgba(255, 255, 255, 0.15)',
+                padding: '1.25rem',
+                borderRadius: '12px',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                transition: 'transform 0.2s, background 0.2s'
+              }}>
+                <label style={{ 
+                  fontSize: '0.85rem', 
+                  opacity: 0.7, 
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  fontWeight: '400',
+                  letterSpacing: '0.5px',
+                  color: 'white'
+                }}>📱 MOBILE NUMBER</label>
+                <span style={{ fontSize: '1rem', fontWeight: '600' }}>{teacher.mobileNumber}</span>
+              </div>
+            )}
             
-            {teacher.personalInfo.address && teacher.personalInfo.address !== 'N/A' && (
+            {teacher.personalInfo.address && teacher.personalInfo.address !== 'N/A' && teacher.personalInfo.address.trim() !== '' && (
               <div className="info-item" style={{
                 background: 'rgba(255, 255, 255, 0.15)',
                 padding: '1.25rem',
@@ -1042,27 +1029,29 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
               </div>
             )}
             
-            <div className="info-item" style={{
-              background: 'rgba(255, 255, 255, 0.15)',
-              padding: '1.25rem',
-              borderRadius: '12px',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              transition: 'transform 0.2s, background 0.2s'
-            }}>
-              <label style={{ 
-                fontSize: '0.85rem', 
-                opacity: 0.7, 
-                display: 'block',
-                marginBottom: '0.5rem',
-                fontWeight: '400',
-                letterSpacing: '0.5px',
-                color: 'white'
-              }}>🚨 EMERGENCY CONTACT</label>
-              <span style={{ fontSize: '1rem', fontWeight: '600' }}>{teacher.personalInfo.emergencyContact}</span>
-            </div>
+            {teacher.personalInfo.emergencyContact && teacher.personalInfo.emergencyContact !== 'N/A' && teacher.personalInfo.emergencyContact.trim() !== '' && (
+              <div className="info-item" style={{
+                background: 'rgba(255, 255, 255, 0.15)',
+                padding: '1.25rem',
+                borderRadius: '12px',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                transition: 'transform 0.2s, background 0.2s'
+              }}>
+                <label style={{ 
+                  fontSize: '0.85rem', 
+                  opacity: 0.7, 
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  fontWeight: '400',
+                  letterSpacing: '0.5px',
+                  color: 'white'
+                }}>🚨 EMERGENCY CONTACT</label>
+                <span style={{ fontSize: '1rem', fontWeight: '600' }}>{teacher.personalInfo.emergencyContact}</span>
+              </div>
+            )}
             
-            {teacher.personalInfo.bloodGroup && teacher.personalInfo.bloodGroup !== 'N/A' && (
+            {teacher.personalInfo.bloodGroup && teacher.personalInfo.bloodGroup !== 'N/A' && teacher.personalInfo.bloodGroup.trim() !== '' && (
               <div className="info-item" style={{
                 background: 'rgba(255, 255, 255, 0.15)',
                 padding: '1.25rem',
@@ -1083,7 +1072,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
               </div>
             )}
             
-            {teacher.personalInfo.dateOfBirth && teacher.personalInfo.dateOfBirth !== 'N/A' && (
+            {teacher.personalInfo.dateOfBirth && teacher.personalInfo.dateOfBirth !== 'N/A' && teacher.personalInfo.dateOfBirth.trim() !== '' && (
               <div className="info-item" style={{
                 background: 'rgba(255, 255, 255, 0.15)',
                 padding: '1.25rem',
@@ -1104,7 +1093,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
               </div>
             )}
             
-            {teacher.personalInfo.joiningDate && teacher.personalInfo.joiningDate !== 'N/A' && (
+            {teacher.personalInfo.joiningDate && teacher.personalInfo.joiningDate !== 'N/A' && teacher.personalInfo.joiningDate.trim() !== '' && (
               <div className="info-item" style={{
                 background: 'rgba(255, 255, 255, 0.15)',
                 padding: '1.25rem',
@@ -1167,9 +1156,94 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
   const renderAssignedClasses = () => {
     if (loading) return <div className="loading-message">Loading...</div>;
     
-    // Get current day of week
+    // Get current day of week and date
     const daysOfWeek = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-    const today = daysOfWeek[new Date().getDay()];
+    const currentDate = new Date();
+    const today = daysOfWeek[currentDate.getDay()];
+    const todayDateString = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    // Check if today is a holiday
+    const isTodayHoliday = holidays.some(holiday => {
+      const startDate = holiday.startDate || holiday.date;
+      const endDate = holiday.endDate || holiday.startDate || holiday.date;
+      
+      if (!startDate) return false;
+      
+      // Normalize dates to compare only date parts (no time)
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      
+      const end = endDate ? new Date(endDate) : new Date(startDate);
+      end.setHours(23, 59, 59, 999);
+      
+      const todayDate = new Date(todayDateString);
+      todayDate.setHours(0, 0, 0, 0);
+      
+      return todayDate >= start && todayDate <= end;
+    });
+    
+    // If today is a holiday, don't show any classes
+    if (isTodayHoliday) {
+      const todayHoliday = holidays.find(holiday => {
+        const startDate = holiday.startDate || holiday.date;
+        const endDate = holiday.endDate || holiday.startDate || holiday.date;
+        if (!startDate) return false;
+        
+        // Normalize dates to compare only date parts (no time)
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        
+        const end = endDate ? new Date(endDate) : new Date(startDate);
+        end.setHours(23, 59, 59, 999);
+        
+        const todayDate = new Date(todayDateString);
+        todayDate.setHours(0, 0, 0, 0);
+        
+        return todayDate >= start && todayDate <= end;
+      });
+      
+      return (
+        <div className="assigned-classes-section">
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: '1rem',
+            paddingBottom: '1rem',
+            borderBottom: '2px solid #e5e7eb'
+          }}>
+            <h3 style={{ margin: 0 }}>Today's Classes ({today})</h3>
+            <div style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: '#fef3c7',
+              color: '#d97706',
+              borderRadius: '8px',
+              fontSize: '0.9rem',
+              fontWeight: '600'
+            }}>
+              🎉 Holiday
+            </div>
+          </div>
+          
+          <div className="no-data-message" style={{
+            textAlign: 'center',
+            padding: '3rem 2rem',
+            backgroundColor: '#fef3c7',
+            borderRadius: '12px',
+            border: '2px solid #fbbf24'
+          }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎊</div>
+            <p style={{ fontSize: '1.2rem', fontWeight: '700', color: '#92400e', marginBottom: '0.5rem' }}>
+              Holiday Today!
+            </p>
+            <p style={{ fontSize: '1.1rem', color: '#78350f', fontWeight: '600', marginBottom: '0.5rem' }}>
+              {todayHoliday?.occasion || todayHoliday?.title || 'Public Holiday'}
+            </p>
+            <p style={{ color: '#92400e' }}>No classes are scheduled today. Enjoy your day off!</p>
+          </div>
+        </div>
+      );
+    }
     
     // Filter classes for today only
     const todayClasses = assignedClasses.filter(cls => 
@@ -1198,6 +1272,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
             {todayClasses.length} {todayClasses.length === 1 ? 'Class' : 'Classes'} Today
           </div>
         </div>
+
         {todayClasses.length === 0 ? (
           <div className="no-data-message" style={{
             textAlign: 'center',
@@ -1319,13 +1394,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
                 onClick={async () => {
-                  console.log('View Students clicked for class:', {
-                    timetableId: cls.id,
-                    classId: cls.classId,
-                    className: cls.className,
-                    section: cls.section
-                  });
-                  
                   if (!cls.classId) {
                     alert('Class ID is missing. Please contact administrator.');
                     return;
@@ -1353,7 +1421,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#059669'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
                 onClick={() => {
-                  console.log('Mark Attendance clicked for:', cls);
                   setSelectedClassForAttendance(cls);
                   setShowMarkAttendance(true);
                 }}
@@ -1375,6 +1442,22 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#7c3aed'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#8b5cf6'}
+                onClick={() => {
+                  // Pre-fill video form with class information
+                  setVideoForm({
+                    title: '',
+                    description: '',
+                    youtubeLink: '',
+                    subject: cls.subject || '',
+                    className: cls.className || '',
+                    section: cls.section || '',
+                    duration: '',
+                    topic: ''
+                  });
+                  setEditingVideo(null);
+                  setShowVideoForm(true);
+                  setActiveTab('lectures'); // Redirect to video lectures tab
+                }}
               >
                 🎥 Upload Lecture
               </button>

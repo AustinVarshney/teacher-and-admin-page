@@ -10,6 +10,12 @@ interface SubjectFormData {
   teacherId: number;
 }
 
+interface BulkSubjectItem {
+  id: string; // temporary ID for UI tracking
+  subjectName: string;
+  teacherId: number;
+}
+
 const SubjectManagement: React.FC = () => {
   const [subjects, setSubjects] = useState<SubjectResponse[]>([]);
   const [classes, setClasses] = useState<ClassInfoResponse[]>([]);
@@ -18,6 +24,7 @@ const SubjectManagement: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showBulkForm, setShowBulkForm] = useState(false);
   const [editingSubject, setEditingSubject] = useState<SubjectResponse | null>(null);
 
   const [formData, setFormData] = useState<SubjectFormData>({
@@ -25,6 +32,12 @@ const SubjectManagement: React.FC = () => {
     classId: 0,
     teacherId: 0
   });
+
+  // Bulk creation state
+  const [bulkClassId, setBulkClassId] = useState<number>(0);
+  const [bulkSubjects, setBulkSubjects] = useState<BulkSubjectItem[]>([
+    { id: Date.now().toString(), subjectName: '', teacherId: 0 }
+  ]);
 
   useEffect(() => {
     fetchSubjects();
@@ -160,6 +173,78 @@ const SubjectManagement: React.FC = () => {
     });
   };
 
+  // Bulk creation handlers
+  const handleAddBulkSubject = () => {
+    setBulkSubjects(prev => [
+      ...prev,
+      { id: Date.now().toString(), subjectName: '', teacherId: 0 }
+    ]);
+  };
+
+  const handleRemoveBulkSubject = (id: string) => {
+    if (bulkSubjects.length <= 1) {
+      setError('At least one subject is required');
+      return;
+    }
+    setBulkSubjects(prev => prev.filter(s => s.id !== id));
+  };
+
+  const handleBulkSubjectChange = (id: string, field: 'subjectName' | 'teacherId', value: any) => {
+    setBulkSubjects(prev => prev.map(s => 
+      s.id === id ? { ...s, [field]: field === 'teacherId' ? Number(value) : value } : s
+    ));
+  };
+
+  const handleBulkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    // Validation
+    if (!bulkClassId || bulkClassId === 0) {
+      setError('Please select a class');
+      return;
+    }
+
+    const invalidSubjects = bulkSubjects.filter(s => !s.subjectName.trim() || !s.teacherId || s.teacherId === 0);
+    if (invalidSubjects.length > 0) {
+      setError('All subjects must have a name and teacher assigned');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await SubjectService.createMultipleSubjects({
+        classId: bulkClassId,
+        subjects: bulkSubjects.map(s => ({
+          subjectName: s.subjectName.trim(),
+          teacherId: s.teacherId
+        }))
+      });
+
+      setSuccess(`Successfully created ${bulkSubjects.length} subjects!`);
+
+      // Reset bulk form
+      setBulkClassId(0);
+      setBulkSubjects([{ id: Date.now().toString(), subjectName: '', teacherId: 0 }]);
+      setShowBulkForm(false);
+
+      // Refresh subjects list
+      await fetchSubjects();
+    } catch (err: any) {
+      setError(err.message || 'Failed to create subjects');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelBulk = () => {
+    setShowBulkForm(false);
+    setBulkClassId(0);
+    setBulkSubjects([{ id: Date.now().toString(), subjectName: '', teacherId: 0 }]);
+  };
+
   const getClassName = (classId: number) => {
     const cls = classes.find(c => c.id === classId);
     return cls ? cls.className : 'Unknown';
@@ -169,16 +254,122 @@ const SubjectManagement: React.FC = () => {
     <div className="subject-management">
       <div className="subject-header">
         <h2>Subject Management</h2>
-        <button 
-          className="btn-primary" 
-          onClick={() => setShowForm(!showForm)}
-        >
-          {showForm ? 'Cancel' : '+ Add New Subject'}
-        </button>
+        <div className="header-buttons">
+          <button 
+            className="btn-primary" 
+            onClick={() => {
+              setShowForm(!showForm);
+              if (showBulkForm) setShowBulkForm(false);
+            }}
+          >
+            {showForm ? 'Cancel' : '+ Add Single Subject'}
+          </button>
+          <button 
+            className="btn-success" 
+            onClick={() => {
+              setShowBulkForm(!showBulkForm);
+              if (showForm) setShowForm(false);
+            }}
+          >
+            {showBulkForm ? 'Cancel' : '📚 Add Multiple Subjects'}
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
       {success && <div className="alert alert-success">{success}</div>}
+
+      {showBulkForm && (
+        <div className="bulk-form-container">
+          <h3>📚 Create Multiple Subjects for a Class</h3>
+          <form onSubmit={handleBulkSubmit} className="bulk-subject-form">
+            <div className="form-group">
+              <label htmlFor="bulkClassId">Select Class *</label>
+              <select
+                id="bulkClassId"
+                value={bulkClassId}
+                onChange={(e) => setBulkClassId(Number(e.target.value))}
+                className="form-select"
+                required
+              >
+                <option value="0">-- Select a Class --</option>
+                {classes.map((cls) => (
+                  <option key={cls.id} value={cls.id}>
+                    {cls.className}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="bulk-subjects-list">
+              <div className="bulk-list-header">
+                <h4>Subjects</h4>
+                <button 
+                  type="button" 
+                  className="btn-add-small" 
+                  onClick={handleAddBulkSubject}
+                >
+                  + Add Another Subject
+                </button>
+              </div>
+
+              {bulkSubjects.map((subject, index) => (
+                <div key={subject.id} className="bulk-subject-row">
+                  <span className="subject-number">{index + 1}.</span>
+                  <input
+                    type="text"
+                    placeholder="Subject name"
+                    value={subject.subjectName}
+                    onChange={(e) => handleBulkSubjectChange(subject.id, 'subjectName', e.target.value)}
+                    className="form-input"
+                    required
+                  />
+                  <select
+                    value={subject.teacherId}
+                    onChange={(e) => handleBulkSubjectChange(subject.id, 'teacherId', e.target.value)}
+                    className="form-select"
+                    required
+                  >
+                    <option value="0">-- Select Teacher --</option>
+                    {teachers.map((teacher) => (
+                      <option key={teacher.id} value={teacher.id}>
+                        {teacher.name}
+                      </option>
+                    ))}
+                  </select>
+                  {bulkSubjects.length > 1 && (
+                    <button
+                      type="button"
+                      className="btn-remove"
+                      onClick={() => handleRemoveBulkSubject(subject.id)}
+                      title="Remove subject"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="form-actions">
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                onClick={handleCancelBulk}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                className="btn-primary" 
+                disabled={loading}
+              >
+                {loading ? 'Creating...' : `Create ${bulkSubjects.length} Subject${bulkSubjects.length > 1 ? 's' : ''}`}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {showForm && (
         <div className="subject-form-container">

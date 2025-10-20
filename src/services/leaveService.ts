@@ -195,6 +195,35 @@ export class LeaveService {
       throw new Error(message);
     }
   }
+
+  // ============ LEAVE ALLOWANCE ============
+  
+  // Get my leave allowance (for teachers/staff)
+  static async getMyLeaveAllowance(): Promise<LeaveAllowanceInfo> {
+    try {
+      const response = await api.get('/staff-leave-allowances/me');
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to fetch leave allowance');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch leave allowance';
+      throw new Error(message);
+    }
+  }
+}
+
+// Leave Allowance Interface
+export interface LeaveAllowanceInfo {
+  id: number;
+  staffId: number;
+  staffName?: string;
+  sessionId: number;
+  sessionName?: string;
+  allowedLeaves: number;
+  leavesUsed: number;
+  remainingLeaves: number;
 }
 
 export default LeaveService;

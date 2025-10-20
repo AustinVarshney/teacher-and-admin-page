@@ -67,7 +67,7 @@ export class TimetableService {
   }
 
   // Get timetable by class
-  static async getTimetableByClass(classId: string | number) {
+  static async getTimetableByClass(classId: string | number, day?: string) {
     try {
       console.log('TimetableService.getTimetableByClass called with:', classId, 'Type:', typeof classId);
       
@@ -75,16 +75,59 @@ export class TimetableService {
         throw new Error('Invalid classId provided to getTimetableByClass');
       }
       
-      const response = await api.get(`/timetables/class/${classId}/timetable`);
+      // Backend endpoint is /timetables/class/{classId}/timetable with optional day param
+      const dayParam = day ? `?day=${day}` : '';
+      const response = await api.get(`/timetables/class/${classId}/timetable${dayParam}`);
       
       if (response.status >= 200 && response.status < 300) {
-        return response.data.data;
+        const timetableData = response.data.data || [];
+        
+        // Map the data to ensure all fields are present
+        // IMPORTANT: Use the period number from backend, don't recalculate it
+        const mappedData = timetableData.map((slot: any) => ({
+          ...slot,
+          day: slot.day || slot.dayOfWeek, // Use enum value or string fallback
+          period: slot.period || 1, // Use period from backend directly
+          subjectName: slot.subjectName || 'Unknown Subject',
+          teacherName: slot.teacherName || 'Unknown Teacher'
+        }));
+        
+        console.log('📅 Mapped timetable data:', mappedData);
+        return mappedData;
       }
       throw new Error(response.data.message || 'Failed to fetch class timetable');
     } catch (error: any) {
       const message = error.response?.data?.message || error.message || 'Failed to fetch class timetable';
+      console.error('Error fetching timetable:', message);
       throw new Error(message);
     }
+  }
+
+  // Helper to calculate period number from start time
+  // Assumes school starts at 08:00, each period is ~45-60 mins
+  // @ts-ignore - Used for future feature
+  private static calculatePeriodNumber(startTime: string): number {
+    if (!startTime) return 1;
+    
+    // Parse time string (format: "HH:mm:ss" or "HH:mm")
+    const timeParts = startTime.split(':');
+    const hours = parseInt(timeParts[0]);
+    const minutes = parseInt(timeParts[1]);
+    
+    // Convert to minutes from midnight
+    const totalMinutes = hours * 60 + minutes;
+    
+    // Assume school starts at 8 AM (480 minutes)
+    const schoolStartMinutes = 8 * 60; // 480
+    const minutesFromStart = totalMinutes - schoolStartMinutes;
+    
+    // Assume ~50 minutes per period (including short breaks)
+    const periodDuration = 50;
+    
+    // Calculate period (1-based)
+    const period = Math.floor(minutesFromStart / periodDuration) + 1;
+    
+    return Math.max(1, Math.min(period, 8)); // Clamp between 1 and 8
   }
 
   // Get timetable by teacher

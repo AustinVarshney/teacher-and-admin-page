@@ -189,6 +189,9 @@ export class AuthService {
     localStorage.removeItem('userType');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('panNumber');
+    localStorage.removeItem('schoolId');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userName');
   }
 
   // Store authentication data with timestamp
@@ -202,6 +205,36 @@ export class AuthService {
     localStorage.setItem('tokenIssuedAt', currentTimestamp.toString());
     localStorage.setItem('tokenExpiresAt', expirationTime.toString());
     
+    // Decode token to extract additional information like schoolId and roles
+    const decoded = this.decodeToken(authData.accessToken);
+    if (decoded) {
+      // Extract and store schoolId from JWT payload
+      if (decoded.schoolId) {
+        localStorage.setItem('schoolId', decoded.schoolId.toString());
+      }
+      
+      // Extract and store roles from JWT payload
+      if (decoded.roles) {
+        const roles = Array.isArray(decoded.roles) ? decoded.roles : [decoded.roles];
+        // Store the first role or the most relevant one
+        if (roles.length > 0) {
+          localStorage.setItem('userRole', roles[0]);
+        }
+      }
+      
+      // Store user info if available in token
+      if (decoded.sub) {
+        localStorage.setItem('userEmail', decoded.sub);
+      }
+      if (decoded.userId) {
+        localStorage.setItem('userId', decoded.userId.toString());
+      }
+      if (decoded.name) {
+        localStorage.setItem('userName', decoded.name);
+      }
+    }
+    
+    // Override with explicit userRole if provided
     if (userRole) {
       localStorage.setItem('userRole', userRole);
     }

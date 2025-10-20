@@ -178,7 +178,7 @@ const ClassManagement: React.FC<ClassManagementProps> = ({ onClassChange }) => {
 
       if (isEditing && currentClass) {
         // Update class - pass id and sessionId separately
-        await ClassService.updateClass(currentClass.id, currentClass.sessionId, formData);
+        await ClassService.updateClass(currentClass.id, formData);
         setSuccessMessage(`Class "${formData.className}" updated successfully!`);
       } else {
         await ClassService.createClass(formData);
@@ -376,7 +376,7 @@ const ClassManagement: React.FC<ClassManagementProps> = ({ onClassChange }) => {
               <div className="form-group">
                 <label htmlFor="className">
                   Class Name <span className="required">*</span>
-                  <span className="hint">e.g., Class 1, Class 2, Grade 10</span>
+                  <span className="hint">e.g., 1-A, 10-B</span>
                 </label>
                 <input
                   type="text"

@@ -21,6 +21,14 @@ export interface SubjectResponse {
   updatedAt?: string;
 }
 
+export interface BulkSubjectData {
+  classId: number;
+  subjects: {
+    subjectName: string;
+    teacherId?: number;  // Optional - can be assigned later
+  }[];
+}
+
 export class SubjectService {
   // Create subject
   static async createSubject(subjectData: SubjectData) {
@@ -33,6 +41,21 @@ export class SubjectService {
       throw new Error(response.data.message || 'Failed to create subject');
     } catch (error: any) {
       const message = error.response?.data?.message || error.message || 'Failed to create subject';
+      throw new Error(message);
+    }
+  }
+
+  // Create multiple subjects for a class
+  static async createMultipleSubjects(bulkData: BulkSubjectData) {
+    try {
+      const response = await api.post('/subjects/multiple', bulkData);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to create subjects');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to create subjects';
       throw new Error(message);
     }
   }

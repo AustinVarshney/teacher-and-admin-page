@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './StudentRegistrationForm.css';
+import AuthService from '../../services/authService';
 
 interface NonTeachingStaffRegistrationFormProps {
   onRegistrationSuccess: () => void;
@@ -108,41 +109,28 @@ const NonTeachingStaffRegistrationForm: React.FC<NonTeachingStaffRegistrationFor
         roles: ['ROLE_NON_TEACHING_STAFF']
       };
 
-      const response = await fetch('http://localhost:8080/api/auth/register/staff', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(requestBody)
+      await AuthService.registerStaff(requestBody);
+
+      setSubmitSuccess('Non-teaching staff registered successfully!');
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+        qualification: '',
+        designation: '',
+        salaryGrade: '',
+        contactNumber: '',
+        joiningDate: ''
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSubmitSuccess('Non-teaching staff registered successfully!');
-        // Reset form
-        setFormData({
-          name: '',
-          email: '',
-          password: '',
-          confirmPassword: '',
-          qualification: '',
-          designation: '',
-          salaryGrade: '',
-          contactNumber: '',
-          joiningDate: ''
-        });
-        onRegistrationSuccess();
-        
-        // Clear success message after 3 seconds
-        setTimeout(() => setSubmitSuccess(''), 3000);
-      } else {
-        setSubmitError(data.message || 'Failed to register staff member');
-      }
+      onRegistrationSuccess();
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSubmitSuccess(''), 3000);
     } catch (error: any) {
       console.error('Registration error:', error);
-      setSubmitError('Network error. Please check if the server is running.');
+      setSubmitError(error.message || 'Failed to register staff member');
     } finally {
       setLoading(false);
     }

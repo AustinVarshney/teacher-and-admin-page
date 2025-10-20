@@ -7,6 +7,8 @@ export interface Student {
   feeStatus: 'paid' | 'pending' | 'overdue';
   feeCatalogStatus: 'up_to_date' | 'pending' | 'overdue';
   currentClass: string;
+  className?: string; // Full class name like "1-A"
+  classId?: number; // Class ID for direct reference
   parentName: string;
   mobileNumber: string;
   // Additional student details

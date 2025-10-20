@@ -35,7 +35,7 @@ const FeeManagement: React.FC = () => {
     setLoading(true);
     try {
       const data = await AdminService.getAllStudents();
-      console.log('Loaded students:', data);
+      // console.log('Loaded students:', data);
       setStudents(data);
     } catch (error: any) {
       setErrorMessage(error.message);

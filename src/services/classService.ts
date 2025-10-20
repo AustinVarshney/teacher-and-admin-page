@@ -114,17 +114,16 @@ export class ClassService {
   }
 
   // Update class
-  static async updateClass(id: string | number, sessionId: number, classData: ClassData): Promise<ClassResponse> {
+  static async updateClass(id: string | number, classData: ClassData): Promise<ClassResponse> {
     try {
-      // Map frontend data to backend format
+      // Map frontend data to backend format - Backend expects feesAmount
       const backendData = {
         className: classData.className,
-        feesAmount: classData.feeAmount,  // Map feeAmount -> feesAmount
-        sessionId: sessionId,  // Use the provided sessionId
-        classTeacherId: classData.classTeacherId  // Required field
+        feesAmount: classData.feeAmount,  // Map feeAmount -> feesAmount for backend
+        classTeacherId: classData.classTeacherId
       };
       
-      // Backend uses PATCH /classes/{id} with sessionId in body
+      // Backend uses PATCH /classes/{id} (not PUT)
       const response = await api.patch(`/classes/${id}`, backendData);
       
       if (response.status >= 200 && response.status < 300) {

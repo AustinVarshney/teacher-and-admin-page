@@ -20,13 +20,13 @@ const VideoLectureService = {
   // Create a new video lecture
   createVideoLecture: async (data: VideoLecture): Promise<VideoLecture> => {
     const response = await api.post('/video-lectures', data);
-    return response.data;
+    return response.data.data || response.data; // Extract from RestResponse wrapper
   },
 
   // Update an existing video lecture
   updateVideoLecture: async (id: number, data: VideoLecture): Promise<VideoLecture> => {
     const response = await api.put(`/video-lectures/${id}`, data);
-    return response.data;
+    return response.data.data || response.data;
   },
 
   // Delete (soft delete) a video lecture
@@ -37,19 +37,19 @@ const VideoLectureService = {
   // Get a video lecture by ID
   getVideoLectureById: async (id: number): Promise<VideoLecture> => {
     const response = await api.get(`/video-lectures/${id}`);
-    return response.data;
+    return response.data.data || response.data;
   },
 
   // Get all video lectures by teacher
   getVideoLecturesByTeacher: async (teacherId: number): Promise<VideoLecture[]> => {
     const response = await api.get(`/video-lectures/teacher/${teacherId}`);
-    return response.data;
+    return response.data.data || response.data || [];
   },
 
   // Get video lectures by class and section
   getVideoLecturesByClass: async (className: string, section: string): Promise<VideoLecture[]> => {
     const response = await api.get(`/video-lectures/class/${className}/section/${section}`);
-    return response.data;
+    return response.data.data || response.data || [];
   },
 
   // Get video lectures by class, section and subject
@@ -59,13 +59,13 @@ const VideoLectureService = {
     subject: string
   ): Promise<VideoLecture[]> => {
     const response = await api.get(`/video-lectures/class/${className}/section/${section}/subject/${subject}`);
-    return response.data;
+    return response.data.data || response.data || [];
   },
 
   // Get all active video lectures
   getAllActiveVideoLectures: async (): Promise<VideoLecture[]> => {
-    const response = await api.get('/video-lectures/all');
-    return response.data;
+    const response = await api.get('/video-lectures');
+    return response.data.data || response.data || [];
   },
 
   // Helper to extract YouTube video ID from URL

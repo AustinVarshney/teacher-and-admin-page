@@ -125,10 +125,10 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
           <p>Admin Credentials:</p>
           <p>Use credentials from initial-setup.sql or slms.txt</p>
           <p className="student-link">
-            <a href="/">Student Login</a>
+            <a href="/student/login">Student Login</a>
           </p>
           <p className="teacher-link">
-            <a href="/teacher">Teacher Login</a>
+            <a href="/teacher/login">Teacher Login</a>
           </p>
         </div>
       </div>

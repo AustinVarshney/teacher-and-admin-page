@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import './App.css'
 import AuthService from './services/authService'
+import { AuthProvider } from './contexts/AuthContext'
+
+// Landing Page
+import LandingPage from './pages/LandingPage'
 
 // Student Pages
 import StudentLogin from './pages/student/StudentLogin'
@@ -10,6 +14,10 @@ import StudentDashboard from './pages/student/StudentDashboard'
 // Admin Pages
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminDashboard from './pages/admin/AdminDashboard'
+import AdminRegister from './pages/AdminRegister'
+
+// Developer Pages
+import DeveloperLogin from './pages/DeveloperLogin'
 
 // Teacher Pages
 import TeacherLogin from './pages/teacher/TeacherLogin'
@@ -118,7 +126,24 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   return children;
 };
 
-function App() {
+// Developer Protected Route Component
+interface DeveloperProtectedRouteProps {
+  children: React.ReactElement;
+}
+
+const DeveloperProtectedRoute: React.FC<DeveloperProtectedRouteProps> = ({ children }) => {
+  const isDeveloperAuthenticated = localStorage.getItem('developerAuth') === 'true';
+
+  if (!isDeveloperAuthenticated) {
+    return <Navigate to="/developer/login" replace />;
+  }
+
+  return children;
+};
+
+// Main App Content Component (needs to be inside Router to use navigation)
+const AppContent = () => {
+  const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [userType, setUserType] = useState<'student' | 'admin' | 'teacher' | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -182,9 +207,23 @@ function App() {
   }
 
   const handleLogout = () => {
+    // Store the current user type before clearing
+    const currentUserType = userType;
+    
     AuthService.logout();
     setIsAuthenticated(false)
     setUserType(null)
+    
+    // Navigate to appropriate login page based on user type
+    if (currentUserType === 'admin') {
+      navigate('/admin/login');
+    } else if (currentUserType === 'teacher') {
+      navigate('/teacher/login');
+    } else if (currentUserType === 'student') {
+      navigate('/student/login');
+    } else {
+      navigate('/'); // Fallback to landing page
+    }
   }
 
   // Show loading screen while checking authentication
@@ -214,16 +253,26 @@ function App() {
   }
 
   return (
-    <Router>
+    <>
       <Routes>
+        {/* Landing Page */}
+        <Route path="/" element={<LandingPage />} />
+
+        {/* Developer Routes */}
+        <Route path="/developer/login" element={<DeveloperLogin />} />
+        <Route 
+          path="/developer/register-school" 
+          element={
+            <DeveloperProtectedRoute>
+              <AdminRegister />
+            </DeveloperProtectedRoute>
+          } 
+        />
+
         {/* Student Routes */}
         <Route 
-          path="/" 
-          element={
-            isAuthenticated && userType === 'student' ? 
-              <Navigate to="/student/dashboard" replace /> : 
-              <StudentLogin onLogin={handleStudentLogin} />
-          } 
+          path="/student" 
+          element={<Navigate to="/student/login" replace />} 
         />
         <Route 
           path="/student/login" 
@@ -249,11 +298,19 @@ function App() {
         {/* Admin Routes */}
         <Route 
           path="/admin" 
+          element={<Navigate to="/admin/login" replace />} 
+        />
+        <Route 
+          path="/admin/login" 
           element={
             isAuthenticated && userType === 'admin' ? 
               <Navigate to="/admin/dashboard" replace /> : 
               <AdminLogin onLogin={handleAdminLogin} />
           } 
+        />
+        <Route 
+          path="/admin/register" 
+          element={<AdminRegister />} 
         />
         <Route 
           path="/admin/dashboard" 
@@ -271,11 +328,7 @@ function App() {
         {/* Teacher Routes */}
         <Route 
           path="/teacher" 
-          element={
-            isAuthenticated && userType === 'teacher' ? 
-              <Navigate to="/teacher/dashboard" replace /> : 
-              <TeacherLogin onLogin={handleTeacherLogin} />
-          } 
+          element={<Navigate to="/teacher/login" replace />} 
         />
         <Route 
           path="/teacher/login" 
@@ -302,8 +355,19 @@ function App() {
           } 
         />
       </Routes>
-    </Router>
-  )
+    </>
+  );
+};
+
+// Main App Component - wraps everything in Router and AuthProvider
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </AuthProvider>
+  );
 }
 
 export default App

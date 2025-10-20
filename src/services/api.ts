@@ -22,6 +22,12 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Include schoolId automatically if available in localStorage
+    const schoolId = localStorage.getItem('schoolId');
+    if (schoolId) {
+      // backend expects schoolId as a header or request attribute; using header 'X-School-Id'
+      config.headers['X-School-Id'] = schoolId;
+    }
     return config;
   },
   (error) => {

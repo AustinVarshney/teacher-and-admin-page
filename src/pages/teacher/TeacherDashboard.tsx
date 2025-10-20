@@ -3,17 +3,15 @@ import './TeacherDashboard.css';
 import { 
   Teacher, 
   AssignedClass, 
-  StudentResult,
   ClassStudent,
   TCApprovalRequest
 } from '../../types/teacher';
 import TeacherService from '../../services/teacherService';
-import LeaveService, { StudentLeaveResponse, StaffLeaveResponse } from '../../services/leaveService';
+import LeaveService, { StudentLeaveResponse, StaffLeaveResponse, LeaveAllowanceInfo } from '../../services/leaveService';
 import QueryService, { StudentQueryResponse, TeacherQueryResponse } from '../../services/queryService';
 import VideoLectureService, { VideoLecture } from '../../services/videoLectureService';
 import MarkAttendance from './MarkAttendance';
 import NotificationService, { NotificationDto } from '../../services/notificationService';
-import galleryService from '../../services/galleryService';
 import { SessionService } from '../../services/sessionService';
 import HolidayService, { Holiday } from '../../services/holidayService';
 
@@ -33,7 +31,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
   // State for data from database
   const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [assignedClasses, setAssignedClasses] = useState<AssignedClass[]>([]);
-  const [studentResults, setStudentResults] = useState<StudentResult[]>([]);
   const [classStudents, setClassStudents] = useState<ClassStudent[]>([]);
   const [studentCounts, setStudentCounts] = useState<{[classId: string]: number}>({});
   const [loading, setLoading] = useState(true);
@@ -47,6 +44,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
   const [studentLeaves, setStudentLeaves] = useState<StudentLeaveResponse[]>([]);
   const [myTeacherQueries, setMyTeacherQueries] = useState<TeacherQueryResponse[]>([]);
   const [myStaffLeaves, setMyStaffLeaves] = useState<StaffLeaveResponse[]>([]);
+  const [leaveAllowance, setLeaveAllowance] = useState<LeaveAllowanceInfo | null>(null);
   
   // Form states for teacher's own queries and leave requests
   const [querySubject, setQuerySubject] = useState('');
@@ -73,28 +71,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
     topic: ''
   });
 
-  // Results Management states - moved from renderResults to fix Hooks violation
-  const [resultsMode, setResultsMode] = useState<'entry' | 'view'>('entry');
-  const [selectedResultClass, setSelectedResultClass] = useState<string>('');
-  const [selectedExam, setSelectedExam] = useState<string>('');
-  const [selectedSubject, setSelectedSubject] = useState<string>('');
-  const [studentScores, setStudentScores] = useState<Array<{
-    panNumber: string;
-    name: string;
-    rollNumber: string;
-    marks: number;
-    grade: string;
-  }>>([]);
-  const [saving, setSaving] = useState(false);
-
-  // Gallery states
-  const [galleryImages, setGalleryImages] = useState<any[]>([]);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imageTitle, setImageTitle] = useState('');
-  const [imageDescription, setImageDescription] = useState('');
-  const [showGalleryUpload, setShowGalleryUpload] = useState(false);
+  // @ts-ignore - Used for future feature
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
+  // @ts-ignore - Used for future feature
   const [sessionLoading, setSessionLoading] = useState(true);
 
   // Fetch active session
@@ -170,6 +149,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
     }
   };
 
+  // Fetch leave allowance for current teacher
+  const fetchLeaveAllowance = async () => {
+    try {
+      const allowance = await LeaveService.getMyLeaveAllowance();
+      setLeaveAllowance(allowance);
+    } catch (err: any) {
+      console.error('Error fetching leave allowance:', err);
+    }
+  };
+
   // Handle teacher responding to student query
   const handleRespondToQuery = async (queryId: number) => {
     try {
@@ -223,6 +212,18 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
         alert('Please fill in all fields');
         return;
       }
+
+      // Calculate days requested
+      const start = new Date(leaveStartDate);
+      const end = new Date(leaveEndDate);
+      const daysRequested = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+      // Validate against remaining leaves (not total allowed)
+      if (leaveAllowance && daysRequested > leaveAllowance.remainingLeaves) {
+        alert(`You cannot request ${daysRequested} days of leave. You only have ${leaveAllowance.remainingLeaves} days remaining. (${leaveAllowance.leavesUsed} already used out of ${leaveAllowance.allowedLeaves} total)`);
+        return;
+      }
+
       await LeaveService.createStaffLeaveRequest({
         teacherId: parseInt(teacher.id),
         startDate: leaveStartDate,
@@ -235,6 +236,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
       setLeaveEndDate('');
       setShowLeaveForm(false);
       fetchMyStaffLeaves();
+      fetchLeaveAllowance();
     } catch (err: any) {
       alert('Failed to submit leave request: ' + err.message);
     }
@@ -323,88 +325,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
     }
   };
 
-  // Gallery Functions
-  const fetchGalleryImages = async () => {
-    try {
-      const images = await galleryService.getAllImages();
-      setGalleryImages(images);
-    } catch (err: any) {
-      console.error('Error fetching gallery images:', err);
-    }
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    }
-  };
-
-  const handleImageUpload = async () => {
-    if (!selectedFile || !teacher?.id) {
-      alert('Please select an image file');
-      return;
-    }
-
-    if (!activeSessionId) {
-      alert('No active session found. Please contact administrator to activate a session.');
-      return;
-    }
-
-    setUploadingImage(true);
-    try {
-      await galleryService.uploadImage({
-        file: selectedFile,
-        title: imageTitle || 'Untitled',
-        description: imageDescription || '',
-        uploadedByType: 'TEACHER',
-        uploadedById: parseInt(teacher.id),
-        uploadedByName: teacher.name,
-        sessionId: activeSessionId
-      });
-
-      alert('Image uploaded successfully!');
-      setSelectedFile(null);
-      setImageTitle('');
-      setImageDescription('');
-      setShowGalleryUpload(false);
-      fetchGalleryImages();
-    } catch (err: any) {
-      console.error('Error uploading image:', err);
-      
-      // Provide more specific error messages
-      let errorMessage = 'Failed to upload image';
-      
-      if (err.response?.status === 401) {
-        errorMessage = 'Authentication failed. Please log in again.';
-      } else if (err.response?.status === 403) {
-        errorMessage = 'You do not have permission to upload images.';
-      } else if (err.response?.status === 404) {
-        // Check for session-related errors
-        const responseMessage = err.response?.data?.message || err.message || '';
-        if (responseMessage.toLowerCase().includes('session')) {
-          errorMessage = 'No active session found. Please contact administrator to activate a session.';
-        } else {
-          errorMessage = responseMessage || 'Resource not found.';
-        }
-      } else if (err.response?.status === 400) {
-        const responseMessage = err.response?.data?.message || err.message || '';
-        errorMessage = responseMessage || 'Invalid request. Please check your input.';
-      } else if (err.response?.status === 413) {
-        errorMessage = 'Image file is too large. Please select a smaller file (max 10MB).';
-      } else if (err.response?.status === 415) {
-        errorMessage = 'Invalid file type. Please upload a valid image file (JPG, PNG, etc.).';
-      } else if (err.response?.status >= 500) {
-        errorMessage = 'Server error. Please try again later or contact support.';
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      
-      alert(errorMessage);
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
   // Fetch notifications from API
   const fetchNotifications = async () => {
     try {
@@ -478,7 +398,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
     fetchStudentLeaves();
     fetchMyTeacherQueries();
     fetchMyStaffLeaves();
-    fetchGalleryImages();
+    fetchLeaveAllowance();
   }, []);
 
   // Fetch video lectures when teacher data is loaded
@@ -487,42 +407,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
       fetchVideoLectures();
     }
   }, [teacher]);
-
-  // Load students when class is selected for results
-  useEffect(() => {
-    if (selectedResultClass) {
-      loadStudentsForResults();
-    }
-  }, [selectedResultClass]);
-
-  // Helper function to load students for results entry
-  const loadStudentsForResults = async () => {
-    if (!selectedResultClass) return;
-
-    const selectedClassData = assignedClasses.find(
-      cls => `${cls.className}-${cls.section}` === selectedResultClass
-    );
-
-    if (selectedClassData && selectedClassData.classId) {
-      try {
-        // Fetch students directly for the class
-        const studentsData = await TeacherService.getStudentsByClass(parseInt(selectedClassData.classId));
-        
-        // Initialize student scores array
-        const initialScores = studentsData.map((student: any) => ({
-          panNumber: student.panNumber,
-          name: student.name,
-          rollNumber: student.classRollNumber || student.rollNumber || 'N/A',
-          marks: 0,
-          grade: ''
-        }));
-
-        setStudentScores(initialScores);
-      } catch (error) {
-        console.error('Error loading students:', error);
-      }
-    }
-  };
 
   const fetchTeacherData = async () => {
     try {
@@ -645,52 +529,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
       setClassStudents([]);
     }
   };
-
-  const fetchStudentResults = async () => {
-    try {
-      // Fetch results for all students in teacher's classes
-      const results: StudentResult[] = [];
-      for (const cls of assignedClasses) {
-        const studentsData = await TeacherService.getStudentsByClass(parseInt(cls.id));
-        for (const student of studentsData) {
-          if (student.panNumber) {
-            try {
-              const scores = await TeacherService.getStudentScores(student.panNumber);
-              scores.forEach((score: any) => {
-                results.push({
-                  id: score.id?.toString() || '',
-                  studentName: student.name || '',
-                  studentClass: cls.className,
-                  section: cls.section,
-                  subject: score.subjectName || '',
-                  examType: score.examType || '',
-                  examDate: score.examDate || '',
-                  marks: score.marksObtained || 0,
-                  totalMarks: score.totalMarks || 100,
-                  percentage: score.percentage || 0,
-                  grade: score.grade || '',
-                  remarks: score.remarks || undefined
-                });
-              });
-            } catch (scoreErr: any) {
-              // Silently skip students with no scores instead of throwing error
-              console.log(`No scores found for student ${student.panNumber}`);
-            }
-          }
-        }
-      }
-      setStudentResults(results);
-    } catch (err: any) {
-      console.error('Error fetching student results:', err);
-    }
-  };
-
-  // Load results when Results tab is activated
-  useEffect(() => {
-    if (activeTab === 'results' && studentResults.length === 0) {
-      fetchStudentResults();
-    }
-  }, [activeTab]);
 
   const handleTCResponse = (tcId: string, response: 'approved' | 'rejected', remarks: string) => {
     const tcRequest = mockTCApprovalRequests.find(req => req.id === tcId);
@@ -2320,6 +2158,47 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
     
     return (
       <div className="leave-requests-section">
+        {/* Leave Allowance Summary */}
+        {leaveAllowance && (
+          <div style={{
+            backgroundColor: '#f0f9ff',
+            border: '2px solid #3b82f6',
+            borderRadius: '10px',
+            padding: '1.5rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div>
+              <h3 style={{ margin: '0 0 0.5rem 0', color: '#1e40af' }}>📅 Your Leave Allowance</h3>
+              <p style={{ margin: 0, color: '#4b5563', fontSize: '0.95rem' }}>
+                Session: <strong>{leaveAllowance.sessionName || 'Current Session'}</strong>
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '2rem' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#3b82f6' }}>
+                  {leaveAllowance.allowedLeaves}
+                </div>
+                <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>Total Allowed</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ef4444' }}>
+                  {leaveAllowance.leavesUsed}
+                </div>
+                <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>Leaves Taken</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#10b981' }}>
+                  {leaveAllowance.remainingLeaves}
+                </div>
+                <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>Remaining</div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h3>Student Leave Requests</h3>
           <button 
@@ -2372,6 +2251,32 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                 />
               </div>
             </div>
+            {/* Show days requested calculation */}
+            {leaveStartDate && leaveEndDate && (() => {
+              const start = new Date(leaveStartDate);
+              const end = new Date(leaveEndDate);
+              const daysRequested = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+              const canRequest = !leaveAllowance || daysRequested <= leaveAllowance.remainingLeaves;
+              return (
+                <div style={{ 
+                  marginBottom: '1rem', 
+                  padding: '0.75rem', 
+                  backgroundColor: canRequest ? '#d1fae5' : '#fee2e2', 
+                  borderRadius: '6px',
+                  border: `2px solid ${canRequest ? '#10b981' : '#ef4444'}`
+                }}>
+                  <div style={{ fontWeight: '500', color: canRequest ? '#065f46' : '#991b1b' }}>
+                    Days Requested: <strong>{daysRequested}</strong>
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: canRequest ? '#047857' : '#b91c1c', marginTop: '0.25rem' }}>
+                    {canRequest 
+                      ? `✅ You have ${leaveAllowance?.remainingLeaves || 0} days remaining`
+                      : `❌ Insufficient balance! You only have ${leaveAllowance?.remainingLeaves || 0} days remaining`
+                    }
+                  </div>
+                </div>
+              );
+            })()}
             <button 
               className="action-btn"
               onClick={handleSubmitStaffLeave}
@@ -2517,639 +2422,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
     );
   };
 
-  const renderResults = () => {
-    // Sample exam types
-    const examTypes = [
-      'FA1 - Formative Assessment 1',
-      'FA2 - Formative Assessment 2',
-      'Mid Term',
-      'FA3 - Formative Assessment 3',
-      'FA4 - Formative Assessment 4',
-      'Final Exam'
-    ];
-
-    const handleMarksChange = (panNumber: string, marks: number) => {
-      setStudentScores(prev => prev.map(student => {
-        if (student.panNumber === panNumber) {
-          // Auto-calculate grade based on percentage
-          const percentage = (marks / 100) * 100;
-          let grade = '';
-          if (percentage >= 90) grade = 'A+';
-          else if (percentage >= 80) grade = 'A';
-          else if (percentage >= 70) grade = 'B+';
-          else if (percentage >= 60) grade = 'B';
-          else if (percentage >= 50) grade = 'C';
-          else if (percentage >= 40) grade = 'D';
-          else grade = 'F';
-
-          return { ...student, marks, grade };
-        }
-        return student;
-      }));
-    };
-
-    const handleGradeChange = (panNumber: string, grade: string) => {
-      setStudentScores(prev => prev.map(student => 
-        student.panNumber === panNumber ? { ...student, grade } : student
-      ));
-    };
-
-    const handleSaveResults = async () => {
-      if (!selectedResultClass || !selectedExam || !selectedSubject) {
-        alert('Please select Class, Exam, and Subject');
-        return;
-      }
-
-      if (studentScores.length === 0) {
-        alert('No student data to save');
-        return;
-      }
-
-      // Validate that at least one student has marks entered
-      const hasMarks = studentScores.some(s => s.marks > 0);
-      if (!hasMarks) {
-        alert('Please enter marks for at least one student');
-        return;
-      }
-
-      setSaving(true);
-      try {
-        // Find the selected class data
-        const selectedClassData = assignedClasses.find(
-          cls => `${cls.className}-${cls.section}` === selectedResultClass
-        );
-
-        if (!selectedClassData) {
-          throw new Error('Selected class not found');
-        }
-
-        // For now, we'll use placeholder IDs since we don't have the actual mapping
-        // In production, you should fetch these from the backend
-        const examIdMap: {[key: string]: number} = {
-          'FA1 - Formative Assessment 1': 1,
-          'FA2 - Formative Assessment 2': 2,
-          'Mid Term': 3,
-          'FA3 - Formative Assessment 3': 4,
-          'FA4 - Formative Assessment 4': 5,
-          'Final Exam': 6
-        };
-
-        const examId = examIdMap[selectedExam] || 1;
-
-        // Prepare scores data
-        const scoresData = studentScores
-          .filter(s => s.marks > 0) // Only save students with marks entered
-          .map(s => ({
-            studentPanNumber: s.panNumber,
-            marks: s.marks,
-            grade: s.grade
-          }));
-
-        if (scoresData.length === 0) {
-          alert('No valid marks to save');
-          setSaving(false);
-          return;
-        }
-
-        // For subject ID, we'll need to fetch it based on subject name
-        // For now, using a placeholder approach
-        console.log('Attempting to save results:', {
-          classId: parseInt(selectedClassData.classId),
-          subject: selectedSubject,
-          examId,
-          scoresCount: scoresData.length
-        });
-
-        alert(`Results will be saved for ${scoresData.length} students!\n\nNote: Full integration with backend subject/exam IDs is pending. Please ensure exams are created in the system first.`);
-        
-        // Uncomment this when backend is ready with proper exam/subject IDs:
-        /*
-        await resultService.bulkUpdateScores({
-          classId: parseInt(selectedClassData.classId),
-          subjectId: subjectId, // Need to fetch this based on selectedSubject
-          examId: examId,
-          scores: scoresData
-        });
-        
-        alert(`Successfully saved results for ${scoresData.length} students!`);
-        
-        // Reset form
-        setSelectedResultClass('');
-        setSelectedExam('');
-        setSelectedSubject('');
-        setStudentScores([]);
-        */
-      } catch (error: any) {
-        console.error('Error saving results:', error);
-        alert(`Failed to save results: ${error.message || 'Unknown error'}`);
-      } finally {
-        setSaving(false);
-      }
-    };
-
-    if (loading) return <div className="loading-message">Loading...</div>;
-    
-    return (
-      <div className="results-section">
-        {/* Mode Toggle */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '1.5rem' 
-        }}>
-          <h3>Results Management</h3>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button
-              onClick={() => setResultsMode('entry')}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                border: '1px solid #e5e7eb',
-                backgroundColor: resultsMode === 'entry' ? '#3b82f6' : 'white',
-                color: resultsMode === 'entry' ? 'white' : '#374151',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
-            >
-              📝 Enter Results
-            </button>
-            <button
-              onClick={() => setResultsMode('view')}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                border: '1px solid #e5e7eb',
-                backgroundColor: resultsMode === 'view' ? '#3b82f6' : 'white',
-                color: resultsMode === 'view' ? 'white' : '#374151',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
-            >
-              📊 View Results
-            </button>
-          </div>
-        </div>
-
-        {resultsMode === 'entry' ? (
-          <div>
-            {/* Filter Section */}
-            <div style={{
-              backgroundColor: '#f9fafb',
-              padding: '1.5rem',
-              borderRadius: '8px',
-              marginBottom: '1.5rem',
-              border: '1px solid #e5e7eb'
-            }}>
-              <h4 style={{ marginBottom: '1rem' }}>Select Class, Exam & Subject</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                    Class
-                  </label>
-                  <select
-                    value={selectedResultClass}
-                    onChange={(e) => setSelectedResultClass(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      borderRadius: '6px',
-                      border: '1px solid #d1d5db'
-                    }}
-                  >
-                    <option value="">Select Class</option>
-                    {Array.from(new Set(assignedClasses.map(cls => `${cls.className}-${cls.section}`))).map((classKey) => {
-                      const cls = assignedClasses.find(c => `${c.className}-${c.section}` === classKey);
-                      return cls ? (
-                        <option key={classKey} value={classKey}>
-                          {cls.className} - {cls.section}
-                        </option>
-                      ) : null;
-                    })}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                    Exam Type
-                  </label>
-                  <select
-                    value={selectedExam}
-                    onChange={(e) => setSelectedExam(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      borderRadius: '6px',
-                      border: '1px solid #d1d5db'
-                    }}
-                  >
-                    <option value="">Select Exam</option>
-                    {examTypes.map((exam) => (
-                      <option key={exam} value={exam}>
-                        {exam}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                    Subject
-                  </label>
-                  <select
-                    value={selectedSubject}
-                    onChange={(e) => setSelectedSubject(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      borderRadius: '6px',
-                      border: '1px solid #d1d5db'
-                    }}
-                  >
-                    <option value="">Select Subject</option>
-                    {Array.from(new Set(assignedClasses.map(cls => cls.subject))).filter(Boolean).map((subject) => (
-                      <option key={subject} value={subject}>
-                        {subject}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Results Entry Table */}
-            {studentScores.length > 0 && (
-              <div>
-                <div style={{
-                  backgroundColor: 'white',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  border: '1px solid #e5e7eb'
-                }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f3f4f6' }}>
-                        <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>
-                          Roll No
-                        </th>
-                        <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>
-                          Student Name
-                        </th>
-                        <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>
-                          Marks (out of 100)
-                        </th>
-                        <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>
-                          Grade
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {studentScores.map((student, index) => (
-                        <tr key={student.panNumber} style={{ backgroundColor: index % 2 === 0 ? 'white' : '#f9fafb' }}>
-                          <td style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb' }}>
-                            {student.rollNumber}
-                          </td>
-                          <td style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb' }}>
-                            {student.name}
-                          </td>
-                          <td style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb' }}>
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={student.marks}
-                              onChange={(e) => handleMarksChange(student.panNumber, Number(e.target.value))}
-                              style={{
-                                width: '100px',
-                                padding: '0.5rem',
-                                borderRadius: '6px',
-                                border: '1px solid #d1d5db',
-                                textAlign: 'center'
-                              }}
-                            />
-                          </td>
-                          <td style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb' }}>
-                            <select
-                              value={student.grade}
-                              onChange={(e) => handleGradeChange(student.panNumber, e.target.value)}
-                              style={{
-                                width: '80px',
-                                padding: '0.5rem',
-                                borderRadius: '6px',
-                                border: '1px solid #d1d5db',
-                                fontWeight: '500'
-                              }}
-                            >
-                              <option value="">-</option>
-                              <option value="A+">A+</option>
-                              <option value="A">A</option>
-                              <option value="B+">B+</option>
-                              <option value="B">B</option>
-                              <option value="C">C</option>
-                              <option value="D">D</option>
-                              <option value="F">F</option>
-                            </select>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                  <button
-                    onClick={() => {
-                      setSelectedResultClass('');
-                      setSelectedExam('');
-                      setSelectedSubject('');
-                      setStudentScores([]);
-                    }}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      borderRadius: '6px',
-                      border: '1px solid #d1d5db',
-                      backgroundColor: 'white',
-                      color: '#374151',
-                      fontWeight: '500',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSaveResults}
-                    disabled={saving}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      borderRadius: '6px',
-                      border: 'none',
-                      backgroundColor: '#10b981',
-                      color: 'white',
-                      fontWeight: '500',
-                      cursor: saving ? 'not-allowed' : 'pointer',
-                      opacity: saving ? 0.6 : 1
-                    }}
-                  >
-                    {saving ? 'Saving...' : '💾 Save All Results'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {studentScores.length === 0 && selectedResultClass && (
-              <div style={{
-                textAlign: 'center',
-                padding: '3rem',
-                color: '#6b7280'
-              }}>
-                <p>📋 Select exam type and subject to load students</p>
-              </div>
-            )}
-
-            {!selectedResultClass && (
-              <div style={{
-                textAlign: 'center',
-                padding: '3rem',
-                color: '#6b7280'
-              }}>
-                <p>👆 Select a class to begin entering results</p>
-              </div>
-            )}
-          </div>
-        ) : (
-          /* View Mode */
-          <div>
-            <div className="no-data-message">
-              <p>📊 View mode coming soon! You'll be able to see all entered results here.</p>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderGallery = () => {
-    return (
-      <div style={{ padding: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <h2>📸 School Gallery</h2>
-          <button
-            onClick={() => setShowGalleryUpload(!showGalleryUpload)}
-            style={{
-              padding: '0.75rem 1.5rem',
-              backgroundColor: '#667eea',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.3s'
-            }}
-          >
-            {showGalleryUpload ? '❌ Cancel' : '📤 Upload Image'}
-          </button>
-        </div>
-
-        {/* Upload Form */}
-        {showGalleryUpload && (
-          <div style={{
-            backgroundColor: '#f3f4f6',
-            padding: '2rem',
-            borderRadius: '12px',
-            marginBottom: '2rem',
-            border: '2px dashed #667eea'
-          }}>
-            <h3 style={{ marginBottom: '1.5rem', color: '#374151' }}>Upload New Image</h3>
-            
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
-                Title
-              </label>
-              <input
-                type="text"
-                value={imageTitle}
-                onChange={(e) => setImageTitle(e.target.value)}
-                placeholder="Enter image title"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '1rem'
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
-                Description
-              </label>
-              <textarea
-                value={imageDescription}
-                onChange={(e) => setImageDescription(e.target.value)}
-                placeholder="Enter image description"
-                rows={3}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '1rem',
-                  resize: 'vertical'
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
-                Select Image File
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  backgroundColor: 'white'
-                }}
-              />
-              {selectedFile && (
-                <p style={{ marginTop: '0.5rem', color: '#10b981', fontSize: '0.9rem' }}>
-                  ✓ Selected: {selectedFile.name}
-                </p>
-              )}
-            </div>
-
-            {!activeSessionId && !sessionLoading && (
-              <div style={{
-                padding: '1rem',
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: '6px',
-                marginBottom: '1rem',
-                color: '#991b1b'
-              }}>
-                ⚠️ No active session found. Please contact administrator to activate a session before uploading.
-              </div>
-            )}
-
-            {sessionLoading && (
-              <div style={{
-                padding: '1rem',
-                backgroundColor: '#fef9e7',
-                border: '1px solid #fad7a0',
-                borderRadius: '6px',
-                marginBottom: '1rem',
-                color: '#7d6608'
-              }}>
-                🔄 Loading session information...
-              </div>
-            )}
-
-            {activeSessionId && (
-              <div style={{
-                padding: '1rem',
-                backgroundColor: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                borderRadius: '6px',
-                marginBottom: '1rem',
-                color: '#166534'
-              }}>
-                ✓ Active session available (ID: {activeSessionId})
-              </div>
-            )}
-
-            <button
-              onClick={handleImageUpload}
-              disabled={!selectedFile || uploadingImage || !activeSessionId || sessionLoading}
-              style={{
-                padding: '0.75rem 2rem',
-                backgroundColor: (uploadingImage || !activeSessionId || sessionLoading) ? '#9ca3af' : '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '500',
-                cursor: (uploadingImage || !selectedFile || !activeSessionId || sessionLoading) ? 'not-allowed' : 'pointer',
-                fontSize: '1rem'
-              }}
-            >
-              {uploadingImage ? '⏳ Uploading...' : '🚀 Upload to Gallery'}
-            </button>
-          </div>
-        )}
-
-        {/* Gallery Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: '1.5rem'
-        }}>
-          {galleryImages.length === 0 ? (
-            <div style={{
-              gridColumn: '1 / -1',
-              textAlign: 'center',
-              padding: '3rem',
-              color: '#6b7280'
-            }}>
-              <p style={{ fontSize: '1.2rem' }}>📷 No images in gallery yet</p>
-              <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Upload your first image to get started!</p>
-            </div>
-          ) : (
-            galleryImages.map((image) => (
-              <div
-                key={image.id}
-                style={{
-                  backgroundColor: 'white',
-                  borderRadius: '12px',
-                  overflow: 'hidden',
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                  transition: 'transform 0.3s, box-shadow 0.3s',
-                  cursor: 'pointer'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-8px)';
-                  e.currentTarget.style.boxShadow = '0 12px 20px rgba(0,0,0,0.15)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-                }}
-              >
-                <div style={{ height: '200px', overflow: 'hidden', backgroundColor: '#f3f4f6' }}>
-                  <img
-                    src={image.imageUrl}
-                    alt={image.title || 'Gallery image'}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover'
-                    }}
-                  />
-                </div>
-                <div style={{ padding: '1rem' }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#111827', fontSize: '1.1rem' }}>
-                    {image.title || 'Untitled'}
-                  </h4>
-                  {image.description && (
-                    <p style={{ margin: '0 0 0.75rem 0', color: '#6b7280', fontSize: '0.9rem', lineHeight: '1.4' }}>
-                      {image.description}
-                    </p>
-                  )}
-                  <div style={{ fontSize: '0.85rem', color: '#9ca3af', borderTop: '1px solid #e5e7eb', paddingTop: '0.75rem' }}>
-                    <p style={{ margin: '0.25rem 0' }}>📤 {image.uploadedByName}</p>
-                    <p style={{ margin: '0.25rem 0' }}>📅 {new Date(image.createdAt).toLocaleDateString()}</p>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    );
-  };
 
   const renderStudentInfo = () => {
     const handleClassChange = async (classValue: string) => {
@@ -3269,12 +2541,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
         return renderVideoLectures();
       case 'leave':
         return renderLeaveRequests();
-      case 'results':
-        return renderResults();
       case 'students':
         return renderStudentInfo();
-      case 'gallery':
-        return renderGallery();
       default:
         return renderHome();
     }
@@ -3336,22 +2604,10 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
               📝 Leave Requests
             </button>
             <button
-              className={`nav-item ${activeTab === 'results' ? 'active' : ''}`}
-              onClick={() => setActiveTab('results')}
-            >
-              📊 Results
-            </button>
-            <button
               className={`nav-item ${activeTab === 'students' ? 'active' : ''}`}
               onClick={() => setActiveTab('students')}
             >
               👥 Student Information
-            </button>
-            <button
-              className={`nav-item ${activeTab === 'gallery' ? 'active' : ''}`}
-              onClick={() => setActiveTab('gallery')}
-            >
-              🖼️ Gallery
             </button>
           </nav>
         </aside>

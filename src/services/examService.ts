@@ -13,7 +13,7 @@ export class ExamService {
   // Create exam
   static async createExam(examData: ExamData) {
     try {
-      const response = await api.post('/exams', examData);
+      const response = await api.post('/exam-types', examData);
       
       if (response.status >= 200 && response.status < 300) {
         return response.data.data;
@@ -28,7 +28,7 @@ export class ExamService {
   // Update exam
   static async updateExam(id: string | number, examData: ExamData) {
     try {
-      const response = await api.put(`/exams/${id}`, examData);
+      const response = await api.put(`/exam-types/${id}`, examData);
       
       if (response.status >= 200 && response.status < 300) {
         return response.data.data;
@@ -43,7 +43,7 @@ export class ExamService {
   // Get exam by ID
   static async getExamById(id: string | number) {
     try {
-      const response = await api.get(`/exams/${id}`);
+      const response = await api.get(`/exam-types/${id}`);
       
       if (response.status >= 200 && response.status < 300) {
         return response.data.data;
@@ -58,7 +58,7 @@ export class ExamService {
   // Get all exams
   static async getAllExams() {
     try {
-      const response = await api.get('/exams');
+      const response = await api.get('/exam-types');
       
       if (response.status >= 200 && response.status < 300) {
         return response.data.data;
@@ -70,7 +70,7 @@ export class ExamService {
     }
   }
 
-  // Get exams by class
+  // Get exams by class (actual Exam entities with subjects)
   static async getExamsByClass(classId: string | number) {
     try {
       const response = await api.get(`/exams/class/${classId}`);
@@ -88,7 +88,7 @@ export class ExamService {
   // Delete exam
   static async deleteExam(id: string | number) {
     try {
-      const response = await api.delete(`/exams/${id}`);
+      const response = await api.delete(`/exam-types/${id}`);
       
       if (response.status >= 200 && response.status < 300) {
         return true;
@@ -103,7 +103,7 @@ export class ExamService {
   // Submit exam result
   static async submitExamResult(examId: string | number, resultData: ResultData) {
     try {
-      const response = await api.post(`/exams/${examId}/results`, resultData);
+      const response = await api.post(`/exam-types/${examId}/results`, resultData);
       
       if (response.status >= 200 && response.status < 300) {
         return response.data.data;
@@ -118,7 +118,7 @@ export class ExamService {
   // Get exam results
   static async getExamResults(examId: string | number) {
     try {
-      const response = await api.get(`/exams/${examId}/results`);
+      const response = await api.get(`/exam-types/${examId}/results`);
       
       if (response.status >= 200 && response.status < 300) {
         return response.data.data;

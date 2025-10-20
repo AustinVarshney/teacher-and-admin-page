@@ -138,6 +138,39 @@ export class AdminService {
     }
   }
 
+  // Update student status (reactivate/deactivate/graduate)
+  static async updateStudentStatus(panNumbers: string[], status: 'ACTIVE' | 'INACTIVE' | 'GRADUATED'): Promise<void> {
+    try {
+      // Backend PUT /students/status accepts { panNumbers: string[], status: UserStatus }
+      const response = await api.put('/students/status', {
+        panNumbers,
+        status
+      });
+      
+      if (response.status < 200 || response.status >= 300) {
+        throw new Error(response.data.message || `Failed to update student status to ${status}`);
+      }
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || `Failed to update student status to ${status}`;
+      throw new Error(message);
+    }
+  }
+
+  // Reactivate students (convenience method)
+  static async reactivateStudents(panNumbers: string[]): Promise<void> {
+    return this.updateStudentStatus(panNumbers, 'ACTIVE');
+  }
+
+  // Deactivate students (convenience method)
+  static async deactivateStudents(panNumbers: string[]): Promise<void> {
+    return this.updateStudentStatus(panNumbers, 'INACTIVE');
+  }
+
+  // Mark students as graduated (convenience method)
+  static async graduateStudents(panNumbers: string[]): Promise<void> {
+    return this.updateStudentStatus(panNumbers, 'GRADUATED');
+  }
+
   // ============ Teacher APIs ============
   
   // Get all teachers
@@ -206,6 +239,7 @@ export class AdminService {
   // Deactivate teacher
   static async deactivateTeacher(id: number): Promise<void> {
     try {
+      // Backend PUT /teachers/{id} deactivates the teacher
       const response = await api.put(`/teachers/${id}`);
       
       if (response.status < 200 || response.status >= 300) {
@@ -220,6 +254,7 @@ export class AdminService {
   // Reactivate teacher
   static async reactivateTeacher(id: number): Promise<void> {
     try {
+      // Backend PUT /teachers/activate/{id} reactivates the teacher
       const response = await api.put(`/teachers/activate/${id}`);
       
       if (response.status < 200 || response.status >= 300) {
@@ -299,6 +334,7 @@ export class AdminService {
   // Deactivate non-teaching staff
   static async deactivateNonTeachingStaff(id: number): Promise<void> {
     try {
+      // Backend PUT /nts/{id} deactivates the staff
       const response = await api.put(`/nts/${id}`);
       
       if (response.status < 200 || response.status >= 300) {
@@ -309,10 +345,10 @@ export class AdminService {
       throw new Error(message);
     }
   }
-  
   // Reactivate non-teaching staff
   static async reactivateNonTeachingStaff(id: number): Promise<void> {
     try {
+      // Backend has PUT /nts/activate/{id} for reactivation
       const response = await api.put(`/nts/activate/${id}`);
       
       if (response.status < 200 || response.status >= 300) {

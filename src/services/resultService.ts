@@ -94,7 +94,7 @@ const resultService = {
    * Bulk update scores for multiple students
    */
   bulkUpdateScores: async (bulkScoreUpdate: BulkScoreUpdate): Promise<ScoreResponseDTO[]> => {
-    const response = await api.post<ScoreResponseDTO[]>('/api/results/bulk-update', bulkScoreUpdate);
+    const response = await api.post<ScoreResponseDTO[]>('/results/bulk-update', bulkScoreUpdate);
     return response.data;
   },
 
@@ -102,7 +102,7 @@ const resultService = {
    * Get all results for a class in a specific exam
    */
   getClassResultsForExam: async (classId: number, examId: number): Promise<ClassResultsDTO> => {
-    const response = await api.get<ClassResultsDTO>(`/api/results/class/${classId}/exam/${examId}`);
+    const response = await api.get<ClassResultsDTO>(`/results/class/${classId}/exam/${examId}`);
     return response.data;
   },
 
@@ -110,7 +110,7 @@ const resultService = {
    * Get all exam results for a specific student
    */
   getStudentAllResults: async (panNumber: string): Promise<StudentResultsDTO> => {
-    const response = await api.get<StudentResultsDTO>(`/api/results/student/${panNumber}`);
+    const response = await api.get<StudentResultsDTO>(`/results/student/${panNumber}`);
     return response.data;
   },
 
@@ -123,7 +123,7 @@ const resultService = {
     examId: number
   ): Promise<ScoreResponseDTO[]> => {
     const response = await api.get<ScoreResponseDTO[]>(
-      `/api/results/class/${classId}/subject/${subjectId}/exam/${examId}`
+      `/results/class/${classId}/subject/${subjectId}/exam/${examId}`
     );
     return response.data;
   },

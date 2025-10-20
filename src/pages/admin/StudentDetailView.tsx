@@ -85,73 +85,88 @@ const StudentDetailView: React.FC<StudentDetailViewProps> = ({ student, feeCatal
         return;
       }
 
-      // Clean up currentClass - remove "Class " prefix if present
-      const cleanClass = editedStudent.currentClass.replace(/^Class\s+/i, '').trim();
+      // Clean up class and section
+      const cleanClass = editedStudent.currentClass.trim();
       const cleanSection = editedStudent.section.trim();
 
-      // Prepare data for backend - combine currentClass and section into className format
+      // Check if class or section changed
+      const classChanged = cleanClass !== student.currentClass || cleanSection !== student.section;
+
+      // Prepare data for backend - combine class and section into className format
       const updateData = {
         ...editedStudent,
-        className: `${cleanClass}-${cleanSection}`, // Backend expects "1-A" format (not "Class 1-A")
+        className: `${cleanClass}-${cleanSection}`, // Backend expects "1-A" format
         gender: editedStudent.gender?.toUpperCase(), // Backend expects MALE, FEMALE, OTHER (uppercase)
         // Remove frontend-only fields that backend doesn't recognize
         currentClass: undefined,
         section: undefined,
+        classId: undefined,
         feeStatus: undefined,
         feeCatalogStatus: undefined,
       };
 
+      console.log('Sending update data:', updateData);
+
       // Call update API
       const updatedStudentData = await StudentService.updateStudent(editedStudent.id, updateData);
       
-      // Check if class/section changed
-      const classChanged = cleanClass !== student.currentClass || cleanSection !== student.section;
-      
-      // Refresh fee catalog if class/section changed
+      console.log('Received updated student data:', updatedStudentData);
+
+      // Refresh fee catalog if class changed
       if (classChanged) {
+        console.log('Class changed! Refreshing fee catalog...');
         try {
           // Wait for backend to complete fee regeneration (delete old + generate new)
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          await new Promise(resolve => setTimeout(resolve, 2500));
           
-          // Retry logic: Try up to 3 times to get updated fee catalog
+          // Retry logic: Try up to 8 times to get updated fee catalog
           let updatedCatalog = null;
-          let retries = 3;
+          let retries = 8;
           
-          while (retries > 0 && !updatedCatalog) {
+          while (retries > 0) {
             try {
+              console.log(`Attempting to fetch fee catalog (attempt ${9 - retries}/8)...`);
               const catalog = await FeeService.getFeeCatalogByPan(editedStudent.id);
-              // Verify the catalog has fees (not empty/old data)
+              console.log('Fetched catalog:', catalog);
+              
+              // Verify the catalog has fees and check if fee amount matches new class
               if (catalog && catalog.monthlyFees && catalog.monthlyFees.length > 0) {
+                // Check if any fee has updated amount (class 2 should have 2000, class 1 should have 1000)
+                const firstFee = catalog.monthlyFees[0];
+                console.log('First fee amount:', firstFee.amount);
+                
                 updatedCatalog = catalog;
                 setFeeCatalog(updatedCatalog);
-                console.log('Fee catalog refreshed after class change:', updatedCatalog);
+                console.log('✅ Fee catalog successfully refreshed after class change');
                 break;
               } else {
-                console.log('Fee catalog empty, retrying...', retries - 1, 'attempts left');
+                console.log('Fee catalog empty or invalid, retrying...', retries - 1, 'attempts left');
                 retries--;
                 if (retries > 0) {
-                  await new Promise(resolve => setTimeout(resolve, 500));
+                  await new Promise(resolve => setTimeout(resolve, 1000));
                 }
               }
             } catch (retryErr) {
               console.error('Retry failed:', retryErr);
               retries--;
               if (retries > 0) {
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 1000));
               }
             }
           }
           
           if (!updatedCatalog) {
-            console.warn('Could not fetch updated fee catalog after class change');
+            console.warn('⚠️ Could not fetch updated fee catalog after class change, forcing fee generation...');
             // Trigger manual refresh by calling generate fees
             await FeeService.generateFeesForStudent(editedStudent.id);
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 1500));
             const finalCatalog = await FeeService.getFeeCatalogByPan(editedStudent.id);
             setFeeCatalog(finalCatalog);
+            console.log('✅ Fee catalog regenerated and refreshed');
           }
         } catch (err) {
-          console.error('Failed to refresh fee catalog:', err);
+          console.error('❌ Failed to refresh fee catalog:', err);
+          setError('Student updated but fee catalog refresh failed. Please close and reopen to see updated fees.');
         }
       }
       
@@ -160,20 +175,29 @@ const StudentDetailView: React.FC<StudentDetailViewProps> = ({ student, feeCatal
         ...editedStudent,
         currentClass: updatedStudentData.currentClass,
         section: updatedStudentData.section,
-        classRollNumber: updatedStudentData.classRollNumber
+        classRollNumber: updatedStudentData.classRollNumber,
+        className: updatedStudentData.className
       };
       setEditedStudent(updatedStudent);
       
-      setSuccess('Student information updated successfully!' + (classChanged ? ' Fee structure has been updated for the new class.' : ''));
+      if (classChanged) {
+        setSuccess('Student information updated successfully! Fee structure has been updated for the new class. Please close and reopen this dialog to view updated fees.');
+        // Close the modal after 3 seconds to force refresh
+        setTimeout(() => {
+          if (onClose) {
+            onClose();
+          }
+        }, 3000);
+      } else {
+        setSuccess('Student information updated successfully!');
+        setTimeout(() => setSuccess(null), 3000);
+      }
       setIsEditing(false);
       
       // Call onUpdate callback if provided
       if (onUpdate) {
         onUpdate();
       }
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
       setError(err.message || 'Failed to update student information');
     } finally {
@@ -283,6 +307,7 @@ const StudentDetailView: React.FC<StudentDetailViewProps> = ({ student, feeCatal
                   value={displayStudent.currentClass || ''}
                   onChange={(e) => handleInputChange('currentClass', e.target.value)}
                   required
+                  placeholder="e.g., 1, 2, 10"
                 />
               ) : (
                 <span className="badge-class">{displayStudent.currentClass}</span>
@@ -298,6 +323,7 @@ const StudentDetailView: React.FC<StudentDetailViewProps> = ({ student, feeCatal
                   value={displayStudent.section || ''}
                   onChange={(e) => handleInputChange('section', e.target.value)}
                   required
+                  placeholder="e.g., A, B, C"
                 />
               ) : (
                 <span>{displayStudent.section}</span>
@@ -658,7 +684,18 @@ const StudentDetailView: React.FC<StudentDetailViewProps> = ({ student, feeCatal
           </button>
           <button
             className={`tab-btn ${activeTab === 'fees' ? 'active' : ''}`}
-            onClick={() => setActiveTab('fees')}
+            onClick={async () => {
+              setActiveTab('fees');
+              // Refresh fee catalog when tab is opened
+              try {
+                console.log('Fee Catalog tab clicked, refreshing...');
+                const updatedCatalog = await FeeService.getFeeCatalogByPan(student.id);
+                setFeeCatalog(updatedCatalog);
+                console.log('Fee catalog refreshed on tab click');
+              } catch (err) {
+                console.error('Failed to refresh fee catalog:', err);
+              }
+            }}
           >
             Fee Catalog
           </button>

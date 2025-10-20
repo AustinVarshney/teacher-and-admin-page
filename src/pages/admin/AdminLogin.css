@@ -132,6 +132,27 @@
   margin: 5px 0;
 }
 
+.register-link {
+  margin-top: 15px !important;
+  font-weight: 500;
+}
+
+.register-link a,
+.student-link a,
+.teacher-link a {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.register-link a:hover,
+.student-link a:hover,
+.teacher-link a:hover {
+  color: #764ba2;
+  text-decoration: underline;
+}
+
 @media (max-width: 480px) {
   .admin-login-container {
     padding: 30px 20px;

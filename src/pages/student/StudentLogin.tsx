@@ -122,10 +122,10 @@ const StudentLogin: React.FC<StudentLoginProps> = ({ onLogin }) => {
             <p className="info-text">📝 New students should contact the admin office for registration</p>
           </div>
           <p className="admin-link">
-            <a href="/admin">Admin Login</a>
+            <a href="/admin/login">Admin Login</a>
           </p>
           <p className="teacher-link">
-            <a href="/teacher">Teacher Login</a>
+            <a href="/teacher/login">Teacher Login</a>
           </p>
         </div>
       </div>

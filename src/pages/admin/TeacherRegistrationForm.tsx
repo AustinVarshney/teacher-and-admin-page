@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './StudentRegistrationForm.css';
+import AuthService from '../../services/authService';
 
 interface TeacherRegistrationFormProps {
   onRegistrationSuccess: () => void;
@@ -15,6 +16,7 @@ interface TeacherFormData {
   salaryGrade: string;
   contactNumber: string;
   joiningDate: string;
+  allowedLeaves: number;
 }
 
 interface FormErrors {
@@ -31,7 +33,8 @@ const TeacherRegistrationForm: React.FC<TeacherRegistrationFormProps> = ({ onReg
     designation: '',
     salaryGrade: '',
     contactNumber: '',
-    joiningDate: ''
+    joiningDate: '',
+    allowedLeaves: 10
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
@@ -77,6 +80,9 @@ const TeacherRegistrationForm: React.FC<TeacherRegistrationFormProps> = ({ onReg
       newErrors.contactNumber = 'Contact number must be 10 digits';
     }
     if (!formData.joiningDate) newErrors.joiningDate = 'Joining date is required';
+    if (!formData.allowedLeaves || formData.allowedLeaves < 0) {
+      newErrors.allowedLeaves = 'Leave allowance must be a positive number';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -104,44 +110,33 @@ const TeacherRegistrationForm: React.FC<TeacherRegistrationFormProps> = ({ onReg
         salaryGrade: formData.salaryGrade,
         contactNumber: formData.contactNumber.trim(),
         joiningDate: formData.joiningDate,
+        allowedLeaves: formData.allowedLeaves || 10,
         roles: ['ROLE_TEACHER']
       };
 
-      const response = await fetch('http://localhost:8080/api/auth/register/staff', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(requestBody)
+      await AuthService.registerStaff(requestBody);
+
+      setSubmitSuccess('Teacher registered successfully!');
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+        qualification: '',
+        designation: '',
+        salaryGrade: '',
+        contactNumber: '',
+        joiningDate: '',
+        allowedLeaves: 10
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSubmitSuccess('Teacher registered successfully!');
-        // Reset form
-        setFormData({
-          name: '',
-          email: '',
-          password: '',
-          confirmPassword: '',
-          qualification: '',
-          designation: '',
-          salaryGrade: '',
-          contactNumber: '',
-          joiningDate: ''
-        });
-        onRegistrationSuccess();
-        
-        // Clear success message after 3 seconds
-        setTimeout(() => setSubmitSuccess(''), 3000);
-      } else {
-        setSubmitError(data.message || 'Failed to register teacher');
-      }
+      onRegistrationSuccess();
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSubmitSuccess(''), 3000);
     } catch (error: any) {
       console.error('Registration error:', error);
-      setSubmitError('Network error. Please check if the server is running.');
+      setSubmitError(error.message || 'Failed to register teacher');
     } finally {
       setLoading(false);
     }
@@ -157,7 +152,8 @@ const TeacherRegistrationForm: React.FC<TeacherRegistrationFormProps> = ({ onReg
       designation: '',
       salaryGrade: '',
       contactNumber: '',
-      joiningDate: ''
+      joiningDate: '',
+      allowedLeaves: 10
     });
     setErrors({});
     setSubmitError('');
@@ -286,6 +282,21 @@ const TeacherRegistrationForm: React.FC<TeacherRegistrationFormProps> = ({ onReg
                 className={errors.joiningDate ? 'error' : ''}
               />
               {errors.joiningDate && <span className="error-text">{errors.joiningDate}</span>}
+            </div>
+
+            <div className="form-group">
+              <label>Leave Allowance (Days) <span className="required">*</span></label>
+              <input
+                type="number"
+                name="allowedLeaves"
+                value={formData.allowedLeaves}
+                onChange={handleChange}
+                placeholder="Default: 10 days"
+                min="0"
+                className={errors.allowedLeaves ? 'error' : ''}
+              />
+              {errors.allowedLeaves && <span className="error-text">{errors.allowedLeaves}</span>}
+              <small style={{ color: '#666', fontSize: '12px' }}>Number of leaves allowed per session</small>
             </div>
           </div>
 

@@ -9,6 +9,9 @@ import SubjectManagement from './SubjectManagement';
 import FeeManagement from './FeeManagement';
 import TimetableManagement from './TimetableManagement';
 import HolidayManagement from './HolidayManagement';
+import MarksUpload from './MarksUpload';
+import ExamManagement from './ExamManagement';
+import GalleryManagement from './GalleryManagement';
 import { FeeService } from '../../services/feeService';
 import AdminService, { StudentResponse, TeacherResponse, NonTeachingStaffResponse, ClassInfoResponse } from '../../services/adminService';
 import StudentService from '../../services/studentService';
@@ -16,7 +19,6 @@ import TransferCertificateService from '../../services/transferCertificateServic
 import NotificationService, { BroadcastMessageDto } from '../../services/notificationService';
 import LeaveService, { StaffLeaveResponse } from '../../services/leaveService';
 import QueryService, { TeacherQueryResponse } from '../../services/queryService';
-import galleryService from '../../services/galleryService';
 import { SessionService } from '../../services/sessionService';
 import { 
   Student, 
@@ -86,15 +88,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [staffLeaves, setStaffLeaves] = useState<StaffLeaveResponse[]>([]);
   const [queryResponseText, setQueryResponseText] = useState<{[key: number]: string}>({});
   const [leaveResponseText, setLeaveResponseText] = useState<{[key: number]: string}>({});
-
-  // Gallery state
-  const [galleryImages, setGalleryImages] = useState<any[]>([]);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imageTitle, setImageTitle] = useState('');
-  const [imageDescription, setImageDescription] = useState('');
-  const [showGalleryUpload, setShowGalleryUpload] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
+
+  // Handle logout properly
+  const handleLogout = () => {
+    // Clear localStorage items (but NOT userType - App.tsx needs it for redirect)
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('adminActiveTab');
+    // Call parent onLogout which will handle navigation and clear userType
+    onLogout();
+  };
+
+  // Scroll to top whenever tab changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activeTab]);
 
   // Fetch active session
   useEffect(() => {
@@ -123,7 +132,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   // Fetch all data on component mount
   useEffect(() => {
     fetchAllData();
-    fetchGalleryImages();
   }, []);
   
   // Load TC requests when switching to TC tab (no auto-refresh)
@@ -375,7 +383,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const handleStudentStatusChange = async (panNumber: string, newStatus: string) => {
     try {
       setLoading(true);
-      await StudentService.updateStudentStatus(panNumber, { status: newStatus });
+      
+      // Use AdminService method which sends correct DTO format
+      await AdminService.updateStudentStatus([panNumber], newStatus as 'ACTIVE' | 'INACTIVE' | 'GRADUATED');
       
       // Refresh student data
       await fetchAllData();
@@ -1610,99 +1620,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     }
   };
 
-  // Gallery functions
-  const fetchGalleryImages = async () => {
-    try {
-      const images = await galleryService.getAllImages();
-      setGalleryImages(images);
-    } catch (error) {
-      console.error('Error fetching gallery images:', error);
-    }
-  };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    }
-  };
-
-  const handleImageUpload = async () => {
-    if (!selectedFile) {
-      alert('Please select an image file');
-      return;
-    }
-
-    if (!imageTitle.trim()) {
-      alert('Please enter an image title');
-      return;
-    }
-
-    if (!activeSessionId) {
-      alert('No active session found. Please contact administrator to activate a session.');
-      return;
-    }
-
-    try {
-      setUploadingImage(true);
-      
-      const adminData = JSON.parse(localStorage.getItem('user') || '{}');
-      
-      await galleryService.uploadImage({
-        file: selectedFile,
-        title: imageTitle,
-        description: imageDescription,
-        uploadedByType: 'ADMIN',
-        uploadedById: adminData.id || 1,
-        uploadedByName: adminData.name || 'Admin',
-        sessionId: activeSessionId
-      });
-
-      alert('Image uploaded successfully!');
-      
-      // Reset form
-      setSelectedFile(null);
-      setImageTitle('');
-      setImageDescription('');
-      setShowGalleryUpload(false);
-      
-      // Refresh gallery
-      fetchGalleryImages();
-    } catch (error: any) {
-      console.error('Error uploading image:', error);
-      
-      // Provide more specific error messages
-      let errorMessage = 'Failed to upload image';
-      
-      if (error.response?.status === 401) {
-        errorMessage = 'Authentication failed. Please log in again.';
-      } else if (error.response?.status === 403) {
-        errorMessage = 'You do not have permission to upload images.';
-      } else if (error.response?.status === 404) {
-        // Check for session-related errors
-        const responseMessage = error.response?.data?.message || error.message || '';
-        if (responseMessage.toLowerCase().includes('session')) {
-          errorMessage = 'No active session found. Please contact administrator to activate a session.';
-        } else {
-          errorMessage = responseMessage || 'Resource not found.';
-        }
-      } else if (error.response?.status === 400) {
-        const responseMessage = error.response?.data?.message || error.message || '';
-        errorMessage = responseMessage || 'Invalid request. Please check your input.';
-      } else if (error.response?.status === 413) {
-        errorMessage = 'Image file is too large. Please select a smaller file (max 10MB).';
-      } else if (error.response?.status === 415) {
-        errorMessage = 'Invalid file type. Please upload a valid image file (JPG, PNG, etc.).';
-      } else if (error.response?.status >= 500) {
-        errorMessage = 'Server error. Please try again later or contact support.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      alert(errorMessage);
-    } finally {
-      setUploadingImage(false);
-    }
-  };
 
   // Handle responding to teacher query
   const handleRespondToTeacherQuery = async (queryId: number) => {
@@ -1855,29 +1773,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 marginBottom: query.response ? '1.25rem' : (query.status === 'OPEN' ? '1.25rem' : 0),
                 border: '1px solid #f3f4f6'
               }}>
-                <p style={{ 
-                  margin: '0 0 0.5rem', 
-                  fontWeight: '600', 
-                  color: '#6b7280',
-                  fontSize: '0.9rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
+                <p style={{ margin: 0, fontWeight: '600', fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem' }}>
                   ❓ Teacher's Question:
                 </p>
-                <p style={{ margin: 0, color: '#374151', lineHeight: '1.7', fontSize: '1rem' }}>
+                <p style={{ margin: 0, fontSize: '0.95rem', color: '#374151', lineHeight: '1.7' }}>
                   {query.content}
                 </p>
               </div>
 
-              {/* Admin Response Display */}
+              {/* Response Section */}
               {query.response && (
                 <div style={{ 
-                  marginTop: '1.25rem', 
-                  padding: '1.25rem', 
                   backgroundColor: '#ecfdf5', 
+                  borderLeft: '4px solid #10b981', 
+                  padding: '1.25rem', 
                   borderRadius: '8px',
-                  borderLeft: '4px solid #10b981'
+                  marginBottom: '1.25rem'
                 }}>
                   <p style={{ 
                     margin: '0 0 0.75rem', 
@@ -2164,163 +2075,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     </div>
   );
 
-  const renderGallery = () => (
-    <div className="gallery-section">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ margin: 0 }}>School Gallery</h2>
-        <button
-          onClick={() => setShowGalleryUpload(!showGalleryUpload)}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500'
-          }}
-        >
-          {showGalleryUpload ? 'Cancel' : '+ Upload Image'}
-        </button>
-      </div>
 
-      {showGalleryUpload && (
-        <div style={{
-          backgroundColor: '#f3f4f6',
-          padding: '20px',
-          borderRadius: '8px',
-          marginBottom: '30px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-        }}>
-          <h3 style={{ marginTop: 0 }}>Upload New Image</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Title:</label>
-              <input
-                type="text"
-                value={imageTitle}
-                onChange={(e) => setImageTitle(e.target.value)}
-                placeholder="Enter image title"
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '5px',
-                  fontSize: '14px'
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Description (Optional):</label>
-              <textarea
-                value={imageDescription}
-                onChange={(e) => setImageDescription(e.target.value)}
-                placeholder="Enter image description"
-                rows={3}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '5px',
-                  fontSize: '14px',
-                  resize: 'vertical'
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Select Image:</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '5px',
-                  fontSize: '14px'
-                }}
-              />
-            </div>
-            <button
-              onClick={handleImageUpload}
-              disabled={uploadingImage}
-              style={{
-                padding: '12px',
-                backgroundColor: uploadingImage ? '#9ca3af' : '#3B82F6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: uploadingImage ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-            >
-              {uploadingImage ? 'Uploading...' : 'Upload Image'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-        gap: '20px',
-        marginTop: '20px'
-      }}>
-        {galleryImages.length === 0 ? (
-          <p style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#6b7280', fontSize: '16px' }}>
-            No images in gallery yet. Upload your first image!
-          </p>
-        ) : (
-          galleryImages.map(image => (
-            <div
-              key={image.id}
-              style={{
-                backgroundColor: 'white',
-                borderRadius: '8px',
-                overflow: 'hidden',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                cursor: 'pointer'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-5px)';
-                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.15)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-              }}
-            >
-              <img
-                src={image.imageUrl}
-                alt={image.title}
-                style={{
-                  width: '100%',
-                  height: '200px',
-                  objectFit: 'cover'
-                }}
-              />
-              <div style={{ padding: '15px' }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '16px', color: '#1f2937' }}>{image.title}</h4>
-                {image.description && (
-                  <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#6b7280', lineHeight: '1.4' }}>
-                    {image.description}
-                  </p>
-                )}
-                <div style={{ fontSize: '12px', color: '#9ca3af' }}>
-                  <p style={{ margin: '4px 0' }}>📤 {image.uploadedByName}</p>
-                  <p style={{ margin: '4px 0' }}>📅 {new Date(image.createdAt).toLocaleDateString()}</p>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
 
   const renderContent = () => {
     switch (activeTab) {
@@ -2346,14 +2101,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         return <EventManagement />;
       case 'timetable':
         return <TimetableManagement />;
+      case 'exams':
+        return <ExamManagement />;
       case 'teacher-queries':
         return renderTeacherQueries();
       case 'staff-leaves':
         return renderStaffLeaves();
+      case 'marks-upload':
+        return <MarksUpload activeSessionId={activeSessionId} />;
       case 'inbox':
         return renderInbox();
       case 'gallery':
-        return renderGallery();
+        return <GalleryManagement />;
       case 'holidays':
         return <HolidayManagement />;
       default:
@@ -2371,7 +2130,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         <div className="nav-actions">
           <button className="nav-btn">🔔</button>
           <button className="nav-btn">👤</button>
-          <button className="nav-btn logout" onClick={onLogout}>Logout</button>
+          <button className="nav-btn logout" onClick={handleLogout}>Logout</button>
         </div>
       </nav>
 
@@ -2433,6 +2192,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               📅 Timetable
             </button>
             <button
+              className={`nav-item ${activeTab === 'exams' ? 'active' : ''}`}
+              onClick={() => setActiveTab('exams')}
+            >
+              📝 Exams
+            </button>
+            <button
               className={`nav-item ${activeTab === 'transfer-certificates' ? 'active' : ''}`}
               onClick={() => setActiveTab('transfer-certificates')}
             >
@@ -2455,6 +2220,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               onClick={() => setActiveTab('staff-leaves')}
             >
               📝 Staff Leaves
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'marks-upload' ? 'active' : ''}`}
+              onClick={() => setActiveTab('marks-upload')}
+            >
+              📊 Upload Marks
             </button>
             <button
               className={`nav-item ${activeTab === 'inbox' ? 'active' : ''}`}

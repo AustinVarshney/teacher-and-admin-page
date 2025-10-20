@@ -4,6 +4,7 @@ import './TCForm.css';
 import StudentService from '../../services/studentService';
 import EventService from '../../services/eventService';
 import TimetableService from '../../services/timetableService';
+import ResultPDFGenerator from '../../utils/resultPDFGenerator';
 import HolidayService from '../../services/holidayService';
 import { FeeService } from '../../services/feeService';
 import { AttendanceService } from '../../services/attendanceService';
@@ -15,6 +16,7 @@ import QueryService, { StudentQueryResponse } from '../../services/queryService'
 import resultService, { StudentResultsDTO } from '../../services/resultService';
 import VideoLectureService, { VideoLecture as VideoLectureType } from '../../services/videoLectureService';
 import galleryService from '../../services/galleryService';
+import PreviousSchoolingService, { PreviousSchoolingRecord } from '../../services/previousSchoolingService';
 
 interface StudentDashboardProps {
   onLogout: () => void;
@@ -26,7 +28,7 @@ type TimetableEntry = { id: string; day: string; period: number; start: string; 
 type EventItem = { id: string; startDate: string; endDate: string; name: string; description?: string; type: 'sports' | 'cultural' | 'academic' | 'meeting'; };
 type FeeStatus = { total: number; paid: number; pending: number; status: 'paid' | 'pending' | 'overdue'; };
 type EnquiryContact = { id: string; subject: string; teacher: string; phone: string; isClassTeacher?: boolean; };
-type GalleryItem = { id: string; title: string; imageUrl: string; };
+type GalleryItem = { id: string; title: string; imageUrl: string; description?: string; createdAt?: string; };
 type VehicleRoute = { id: string; route: string; pickup: string; drop: string; note?: string; };
 type PreviousClassRecord = { id: string; classLabel: string; schoolName: string; passingYear: string; percentage: string; grade: string; gallery: GalleryItem[]; resultUrl?: string; certificateUrl?: string; };
 
@@ -57,9 +59,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [studentResults, setStudentResults] = useState<StudentResultsDTO | null>(null);
   const [resultsLoading, setResultsLoading] = useState(false);
+  const [resultsError, setResultsError] = useState<string | null>(null);
   const [videoLectures, setVideoLectures] = useState<VideoLectureType[]>([]);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [previousSchoolingRecords, setPreviousSchoolingRecords] = useState<PreviousSchoolingRecord[]>([]);
+  const [previousSchoolingLoading, setPreviousSchoolingLoading] = useState(false);
+  const [previousSchoolingError, setPreviousSchoolingError] = useState<string | null>(null);
   
   // Attendance month selection state
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -105,7 +111,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
           schoolName: 'Mauritius International School',
           schoolLogo: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-8IRdKonj2lw5KF7osJq3GRJSOrjKiKck0g&s',
           classId: classId,
-          section: studentData.section || 'A'
+          section: studentData.section || 'A',
+          sessionId: studentData.sessionId
         });
 
         // Fetch timetable for student's class - ONLY if classId is valid
@@ -287,11 +294,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
   const fetchGalleryImages = async () => {
     try {
-      const images = await galleryService.getAllImages();
+      // Fetch gallery images by student's session ID if available
+      const sessionId = student?.sessionId;
+      const images = await galleryService.getAllImages(sessionId);
       setGallery(images.map(img => ({
         id: img.id.toString(),
-        title: img.title || 'Untitled',
-        imageUrl: img.imageUrl
+        title: img.title || 'Gallery Image',
+        imageUrl: img.imageUrl,
+        description: img.description,
+        createdAt: img.createdAt
       })));
     } catch (err) {
       console.warn('No gallery images available:', err);
@@ -306,6 +317,48 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
     }
     fetchGalleryImages();
   }, [student]);
+
+  // Auto-fetch results when results tab is opened
+  useEffect(() => {
+    const fetchResults = async () => {
+      if (activeTab === 'results' && student?.pan && !studentResults && !resultsLoading) {
+        setResultsLoading(true);
+        setResultsError(null);
+        try {
+          const results = await resultService.getStudentAllResults(student.pan);
+          setStudentResults(results);
+        } catch (err: any) {
+          console.error('Error fetching results:', err);
+          setResultsError(err.message || 'Failed to load results. Please try again.');
+        } finally {
+          setResultsLoading(false);
+        }
+      }
+    };
+
+    fetchResults();
+  }, [activeTab, student?.pan]);
+
+  // Auto-fetch previous schooling records when history tab is opened
+  useEffect(() => {
+    const fetchPreviousSchooling = async () => {
+      if (activeTab === 'history' && !previousSchoolingLoading && previousSchoolingRecords.length === 0) {
+        setPreviousSchoolingLoading(true);
+        setPreviousSchoolingError(null);
+        try {
+          const records = await PreviousSchoolingService.getMyPreviousSchoolingRecords();
+          setPreviousSchoolingRecords(records);
+        } catch (err: any) {
+          console.error('Error fetching previous schooling records:', err);
+          setPreviousSchoolingError(err.message || 'Failed to load previous schooling records');
+        } finally {
+          setPreviousSchoolingLoading(false);
+        }
+      }
+    };
+
+    fetchPreviousSchooling();
+  }, [activeTab, previousSchoolingRecords.length]);
 
   // Fetch Transfer Certificate requests
   useEffect(() => {
@@ -483,6 +536,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
     { id: 'r2', route: 'Route 2 - City Center', pickup: '07:25 AM', drop: '02:45 PM' },
   ];
 
+  // @ts-ignore - Used for future feature
   const previousRecords: PreviousClassRecord[] = [
     {
       id: 'p1',
@@ -576,7 +630,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
     // Process real attendance data from API
     // attendanceData is an array of AttendanceInfoDto objects
     if (attendanceData && attendanceData.length > 0) {
-      console.log('Building attendance sets from data:', attendanceData);
+      // console.log('Building attendance sets from data:', attendanceData);
       
       attendanceData.forEach((attendanceInfo: any) => {
         if (attendanceInfo.attendances && Array.isArray(attendanceInfo.attendances)) {
@@ -594,7 +648,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                   console.log('Added present date:', record.date, '→', dateStr);
                 } else if (record.present === false) {
                   absent.add(dateStr);
-                  console.log('Added absent date:', record.date, '→', dateStr);
+                  // console.lo g('Added absent date:', record.date, '→', dateStr);
                 }
               } else {
                 console.warn('Failed to parse date:', record.date);
@@ -604,8 +658,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         }
       });
       
-      console.log('Present dates:', Array.from(present));
-      console.log('Absent dates:', Array.from(absent));
+      // console.log('Present dates:', Array.from(present));
+      // console.log('Absent dates:', Array.from(absent));
     }
     
     return { present, absent };
@@ -1731,43 +1785,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
           <section className="results-section">
             <SectionHeader icon="📊" title="Academic Results" />
             
-            {/* Fetch Results Button */}
-            {!studentResults && !resultsLoading && student?.pan && (
-              <div style={{
-                textAlign: 'center',
-                padding: '3rem',
-                backgroundColor: '#f9fafb',
-                borderRadius: '12px',
-                border: '1px solid #e5e7eb'
-              }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
-                <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
-                  View your complete academic performance across all exams
-                </p>
-                <button 
-                  className="download-btn"
-                  onClick={async () => {
-                    setResultsLoading(true);
-                    try {
-                      const results = await resultService.getStudentAllResults(student.pan);
-                      setStudentResults(results);
-                    } catch (err) {
-                      console.error('Error fetching results:', err);
-                      alert('Failed to load results. Please try again.');
-                    } finally {
-                      setResultsLoading(false);
-                    }
-                  }}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    fontSize: '1rem'
-                  }}
-                >
-                  📈 Load My Results
-                </button>
-              </div>
-            )}
-
             {/* Loading State */}
             {resultsLoading && (
               <div style={{
@@ -1777,6 +1794,44 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
               }}>
                 <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
                 <p>Loading your results...</p>
+              </div>
+            )}
+
+            {/* Error State */}
+            {resultsError && !resultsLoading && (
+              <div style={{
+                textAlign: 'center',
+                padding: '3rem',
+                backgroundColor: '#fee',
+                borderRadius: '12px',
+                border: '1px solid #fcc'
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
+                <p style={{ color: '#dc3545', marginBottom: '1.5rem' }}>
+                  {resultsError}
+                </p>
+                <button 
+                  className="download-btn"
+                  onClick={async () => {
+                    setResultsLoading(true);
+                    setResultsError(null);
+                    try {
+                      const results = await resultService.getStudentAllResults(student.pan);
+                      setStudentResults(results);
+                    } catch (err: any) {
+                      console.error('Error fetching results:', err);
+                      setResultsError(err.message || 'Failed to load results. Please try again.');
+                    } finally {
+                      setResultsLoading(false);
+                    }
+                  }}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    fontSize: '1rem'
+                  }}
+                >
+                  � Retry
+                </button>
               </div>
             )}
 
@@ -1883,29 +1938,44 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                                   {subjectScore.subjectName}
                                 </td>
                                 <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                                  {subjectScore.marks}
+                                  {subjectScore.marks !== null && subjectScore.marks !== undefined ? subjectScore.marks : '-'}
                                 </td>
                                 <td style={{ padding: '0.75rem', textAlign: 'center' }}>
                                   {subjectScore.maxMarks}
                                 </td>
                                 <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                                  {((subjectScore.marks / subjectScore.maxMarks) * 100).toFixed(1)}%
+                                  {subjectScore.marks !== null && subjectScore.marks !== undefined
+                                    ? `${((subjectScore.marks / subjectScore.maxMarks) * 100).toFixed(1)}%`
+                                    : '-'}
                                 </td>
                                 <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                                  <span style={{
-                                    padding: '0.25rem 0.5rem',
-                                    borderRadius: '6px',
-                                    backgroundColor: subjectScore.grade === 'A+' || subjectScore.grade === 'A' ? '#d1fae5' :
-                                                   subjectScore.grade === 'B+' || subjectScore.grade === 'B' ? '#dbeafe' :
-                                                   subjectScore.grade === 'C' ? '#fef3c7' : '#fee2e2',
-                                    color: subjectScore.grade === 'A+' || subjectScore.grade === 'A' ? '#065f46' :
-                                           subjectScore.grade === 'B+' || subjectScore.grade === 'B' ? '#1e40af' :
-                                           subjectScore.grade === 'C' ? '#92400e' : '#991b1b',
-                                    fontWeight: '600',
-                                    fontSize: '0.85rem'
-                                  }}>
-                                    {subjectScore.grade}
-                                  </span>
+                                  {subjectScore.marks !== null && subjectScore.marks !== undefined ? (
+                                    <span style={{
+                                      padding: '0.25rem 0.5rem',
+                                      borderRadius: '6px',
+                                      backgroundColor: subjectScore.grade === 'A+' || subjectScore.grade === 'A' ? '#d1fae5' :
+                                                     subjectScore.grade === 'B+' || subjectScore.grade === 'B' ? '#dbeafe' :
+                                                     subjectScore.grade === 'C' ? '#fef3c7' : '#fee2e2',
+                                      color: subjectScore.grade === 'A+' || subjectScore.grade === 'A' ? '#065f46' :
+                                             subjectScore.grade === 'B+' || subjectScore.grade === 'B' ? '#1e40af' :
+                                             subjectScore.grade === 'C' ? '#92400e' : '#991b1b',
+                                      fontWeight: '600',
+                                      fontSize: '0.85rem'
+                                    }}>
+                                      {subjectScore.grade}
+                                    </span>
+                                  ) : (
+                                    <span style={{
+                                      padding: '0.25rem 0.5rem',
+                                      borderRadius: '6px',
+                                      backgroundColor: '#f3f4f6',
+                                      color: '#6b7280',
+                                      fontWeight: '500',
+                                      fontSize: '0.85rem'
+                                    }}>
+                                      Not Added
+                                    </span>
+                                  )}
                                 </td>
                               </tr>
                             ))}
@@ -1953,8 +2023,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                           <button 
                             className="download-btn"
                             onClick={() => {
-                              // In real implementation, generate PDF
-                              alert(`Downloading result for ${examResult.examName}...`);
+                              try {
+                                ResultPDFGenerator.generateExamResultPDF(
+                                  studentResults,
+                                  examResult,
+                                  student?.schoolName || 'School Learning Management System'
+                                );
+                              } catch (error) {
+                                console.error('Error generating PDF:', error);
+                                alert('Failed to generate PDF. Please try again.');
+                              }
                             }}
                             style={{
                               backgroundColor: '#10b981',
@@ -2101,14 +2179,71 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
           <section className="gallery-section">
             <SectionHeader icon="🖼️" title="Gallery" />
             <div className="gallery-container">
-              {gallery.map(img => (
-                <div key={img.id} className="gallery-card">
-                  <div className="gallery-image-container">
-                    <img className="gallery-image" src={img.imageUrl} alt={img.title} />
-                  </div>
-                  <div className="gallery-title">{img.title}</div>
+              {gallery.length === 0 ? (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '40px', 
+                  color: '#666',
+                  fontSize: '16px' 
+                }}>
+                  <p>📷 No images available in gallery yet.</p>
+                  <p style={{ fontSize: '14px', marginTop: '10px' }}>Images will appear here once uploaded by admin.</p>
                 </div>
-              ))}
+              ) : (
+                gallery.map(img => (
+                  <div key={img.id} className="gallery-card">
+                    <div className="gallery-image-container">
+                      <img className="gallery-image" src={img.imageUrl} alt={img.title} />
+                    </div>
+                    <div className="gallery-title">{img.title}</div>
+                    {img.description && (
+                      <div className="gallery-description">{img.description}</div>
+                    )}
+                    <div className="gallery-uploaded">
+                      {
+                        (() => {
+                          try {
+                            if (!img.createdAt) return 'Uploaded: Date unavailable';
+                            // Handle format: 2025-10-21 01:40:31.233000
+                            const dateStr = img.createdAt.toString();
+                            const [datePart, timePart] = dateStr.split(' ');
+
+                            return `Uploaded On : ${datePart}`
+                            
+                            // if (!datePart) return 'Uploaded: Date unavailable';
+                            
+                            // // Parse date
+                            // const date = new Date(datePart);
+                            // if (isNaN(date.getTime())) return 'Uploaded: Date unavailable';
+                            
+                            // const formattedDate = date.toLocaleDateString('en-US', { 
+                            //   year: 'numeric', 
+                            //   month: 'short', 
+                            //   day: 'numeric' 
+                            // });
+                            
+                            // // Parse time if available
+                            // if (timePart) {
+                            //   const timeOnly = timePart.split('.')[0]; // Remove microseconds
+                            //   const [hours, minutes] = timeOnly.split(':');
+                            //   const hour = parseInt(hours, 10);
+                            //   const minute = minutes;
+                            //   const ampm = hour >= 12 ? 'PM' : 'AM';
+                            //   const displayHour = hour % 12 || 12;
+                              
+                            //   return `Uploaded: ${formattedDate} at ${displayHour}:${minute} ${ampm}`;
+                            // }
+                            
+                            // return `Uploaded: ${formattedDate}`;
+                          } catch (e) {
+                            return 'Uploaded: Date unavailable';
+                          }
+                        })()
+                      }
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </section>
         )}
@@ -2527,44 +2662,230 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         {activeTab === 'history' && (
           <section className="previous-schools-section">
             <SectionHeader icon="📚" title="Previous Schooling Records" />
-            <div className="school-records">
-              {previousRecords.map(rec => (
-                <div key={rec.id} className="school-card">
-                  <h3>{rec.classLabel}</h3>
-                  <p><strong>School:</strong> {rec.schoolName}</p>
-                  <p><strong>Passing Year:</strong> {rec.passingYear}</p>
-                  <p><strong>Percentage:</strong> {rec.percentage} • <strong>Grade:</strong> {rec.grade}</p>
-                  {rec.gallery.map(g => (
-                    <div key={g.id} style={{ marginTop: 10 }}>
-                      <img src={g.imageUrl} alt={g.title} style={{ width: '100%', borderRadius: 8 }} />
-                      <div style={{ marginTop: 6, color: '#333', fontWeight: 600 }}>{g.title}</div>
+            
+            {/* Loading State */}
+            {previousSchoolingLoading && (
+              <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
+                <p>Loading your previous schooling records...</p>
+              </div>
+            )}
+
+            {/* Error State */}
+            {previousSchoolingError && !previousSchoolingLoading && (
+              <div style={{
+                textAlign: 'center',
+                padding: '3rem',
+                backgroundColor: '#fee',
+                borderRadius: '12px',
+                border: '1px solid #fcc'
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
+                <p style={{ color: '#dc3545' }}>{previousSchoolingError}</p>
+              </div>
+            )}
+
+            {/* No Records State */}
+            {!previousSchoolingLoading && !previousSchoolingError && previousSchoolingRecords.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📚</div>
+                <p>No previous schooling records found.</p>
+                <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                  Your academic history from past sessions will appear here.
+                </p>
+              </div>
+            )}
+
+            {/* Records Display */}
+            {!previousSchoolingLoading && previousSchoolingRecords.length > 0 && (
+              <div className="school-records" style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+                gap: '1.5rem',
+                marginTop: '1.5rem'
+              }}>
+                {previousSchoolingRecords.map((record, index) => (
+                  <div key={index} className="school-card" style={{
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '12px',
+                    padding: '1.5rem',
+                    backgroundColor: 'white',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    transition: 'transform 0.2s, box-shadow 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+                  }}>
+                    {/* Header */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '1rem',
+                      paddingBottom: '1rem',
+                      borderBottom: '2px solid #f3f4f6'
+                    }}>
+                      <h3 style={{ margin: 0, fontSize: '1.5rem', color: '#1f2937' }}>
+                        Class {record.className}-{record.section}
+                      </h3>
+                      <span style={{
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '12px',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        backgroundColor: record.status === 'COMPLETED' ? '#d1fae5' :
+                                       record.status === 'TRANSFERRED' ? '#fef3c7' : '#dbeafe',
+                        color: record.status === 'COMPLETED' ? '#065f46' :
+                               record.status === 'TRANSFERRED' ? '#92400e' : '#1e40af'
+                      }}>
+                        {record.status}
+                      </span>
                     </div>
-                  ))}
-                  <div className="button-row">
-                    {rec.resultUrl && (
-                      <button 
-                        type="button"
-                        className="download-btn"
-                        onClick={() => window.open(rec.resultUrl!, '_blank')}
-                        aria-label={`Download ${rec.classLabel} result`}
-                      >
-                        ⬇️ Download Result
-                      </button>
+
+                    {/* Session Info */}
+                    <div style={{ marginBottom: '1rem' }}>
+                      <p style={{ margin: '0.5rem 0', color: '#4b5563' }}>
+                        <strong>Session:</strong> {record.sessionName}
+                      </p>
+                      <p style={{ margin: '0.5rem 0', color: '#4b5563' }}>
+                        <strong>Passing Year:</strong> {record.passingYear}
+                      </p>
+                    </div>
+
+                    {/* Overall Performance */}
+                    <div style={{
+                      backgroundColor: '#f9fafb',
+                      padding: '1rem',
+                      borderRadius: '8px',
+                      marginBottom: '1rem'
+                    }}>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '1rem'
+                      }}>
+                        <div>
+                          <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                            Overall Percentage
+                          </div>
+                          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3b82f6' }}>
+                            {record.overallPercentage.toFixed(1)}%
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                            Overall Grade
+                          </div>
+                          <div style={{
+                            fontSize: '1.5rem',
+                            fontWeight: '700',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '8px',
+                            display: 'inline-block',
+                            backgroundColor: record.overallGrade === 'A+' || record.overallGrade === 'A' ? '#d1fae5' :
+                                           record.overallGrade === 'B+' || record.overallGrade === 'B' ? '#dbeafe' :
+                                           record.overallGrade === 'C' ? '#fef3c7' : '#fee2e2',
+                            color: record.overallGrade === 'A+' || record.overallGrade === 'A' ? '#065f46' :
+                                   record.overallGrade === 'B+' || record.overallGrade === 'B' ? '#1e40af' :
+                                   record.overallGrade === 'C' ? '#92400e' : '#991b1b'
+                          }}>
+                            {record.overallGrade}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Attendance */}
+                    <div style={{
+                      backgroundColor: '#f0fdf4',
+                      padding: '1rem',
+                      borderRadius: '8px',
+                      marginBottom: '1rem'
+                    }}>
+                      <div style={{ fontSize: '0.9rem', fontWeight: '600', color: '#065f46', marginBottom: '0.5rem' }}>
+                        📊 Attendance Summary
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#059669' }}>
+                        <span>Present: {record.totalPresent} days</span>
+                        <span>Absent: {record.totalAbsent} days</span>
+                      </div>
+                      <div style={{
+                        marginTop: '0.5rem',
+                        fontSize: '1.1rem',
+                        fontWeight: '600',
+                        color: '#065f46',
+                        textAlign: 'center'
+                      }}>
+                        {record.attendancePercentage.toFixed(1)}% Attendance
+                      </div>
+                    </div>
+
+                    {/* Exam Results */}
+                    {record.examResults && record.examResults.length > 0 && (
+                      <div style={{ marginTop: '1rem' }}>
+                        <div style={{
+                          fontSize: '0.9rem',
+                          fontWeight: '600',
+                          color: '#1f2937',
+                          marginBottom: '0.75rem'
+                        }}>
+                          📝 Exam Performance
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {record.examResults.map((exam, examIndex) => (
+                            <div key={examIndex} style={{
+                              padding: '0.75rem',
+                              backgroundColor: '#f9fafb',
+                              borderRadius: '6px',
+                              border: '1px solid #e5e7eb'
+                            }}>
+                              <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}>
+                                <div>
+                                  <div style={{ fontWeight: '600', fontSize: '0.9rem', color: '#1f2937' }}>
+                                    {exam.examName}
+                                  </div>
+                                  <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                    {exam.obtainedMarks}/{exam.totalMarks} marks
+                                  </div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                  <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#3b82f6' }}>
+                                    {exam.percentage.toFixed(1)}%
+                                  </div>
+                                  <span style={{
+                                    padding: '0.2rem 0.5rem',
+                                    borderRadius: '6px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    backgroundColor: exam.grade === 'A+' || exam.grade === 'A' ? '#d1fae5' :
+                                                   exam.grade === 'B+' || exam.grade === 'B' ? '#dbeafe' :
+                                                   exam.grade === 'C' ? '#fef3c7' : '#fee2e2',
+                                    color: exam.grade === 'A+' || exam.grade === 'A' ? '#065f46' :
+                                           exam.grade === 'B+' || exam.grade === 'B' ? '#1e40af' :
+                                           exam.grade === 'C' ? '#92400e' : '#991b1b'
+                                  }}>
+                                    {exam.grade}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                    {rec.certificateUrl && (
-                      <button 
-                        type="button"
-                        className="download-btn"
-                        onClick={() => window.open(rec.certificateUrl!, '_blank')}
-                        aria-label={`Download ${rec.classLabel} certificate`}
-                      >
-                        ⬇️ Download Certificate
-                      </button>
-                    )}
-          </div>
-        </div>
-              ))}
-            </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         )}
       </main>

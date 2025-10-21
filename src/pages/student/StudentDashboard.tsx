@@ -17,6 +17,7 @@ import resultService, { StudentResultsDTO } from '../../services/resultService';
 import VideoLectureService, { VideoLecture as VideoLectureType } from '../../services/videoLectureService';
 import galleryService from '../../services/galleryService';
 import PreviousSchoolingService, { PreviousSchoolingRecord } from '../../services/previousSchoolingService';
+import PeriodSettingsService, { PeriodSettings } from '../../services/periodSettingsService';
 
 interface StudentDashboardProps {
   onLogout: () => void;
@@ -66,6 +67,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
   const [previousSchoolingRecords, setPreviousSchoolingRecords] = useState<PreviousSchoolingRecord[]>([]);
   const [previousSchoolingLoading, setPreviousSchoolingLoading] = useState(false);
   const [previousSchoolingError, setPreviousSchoolingError] = useState<string | null>(null);
+  
+  // Period settings state
+  const [periodSettings, setPeriodSettings] = useState<PeriodSettings>({
+    periodDuration: 40,
+    schoolStartTime: '08:00',
+    lunchPeriod: 4,
+    lunchDuration: 60
+  });
   
   // Attendance month selection state
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -260,6 +269,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         } catch (attendanceError) {
           console.warn('No attendance data available:', attendanceError);
           setAttendanceData([]);
+        }
+
+        // Fetch period settings from backend
+        try {
+          const settings = await PeriodSettingsService.getPeriodSettings();
+          console.log('Period settings loaded:', settings);
+          setPeriodSettings(settings);
+        } catch (periodError) {
+          console.warn('Using default period settings:', periodError);
+          // Keep default period settings
         }
 
       } catch (err: any) {
@@ -1185,18 +1204,65 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         {/* Timetable Tab - Using API Data */}
         {!loading && !error && activeTab === 'timetable' && (() => {
           const weekDays = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-          const periods = [1, 2, 3, 4, 'LUNCH', 5, 6, 7, 8];
-          const periodTimes = [
-            '08:00 - 09:00',
-            '09:00 - 10:00',
-            '10:00 - 11:00',
-            '11:00 - 12:00',
-            '12:00 - 01:00',
-            '01:00 - 02:00',
-            '02:00 - 03:00',
-            '03:00 - 04:00',
-            '04:00 - 05:00'
-          ];
+          
+          // Generate periods dynamically based on period settings
+          const generatePeriods = () => {
+            const periods: any[] = [];
+            const { periodDuration, schoolStartTime, lunchPeriod, lunchDuration } = periodSettings;
+            
+            // Helper to add minutes to time
+            const addMinutesToTime = (time: string, minutes: number): string => {
+              const [hours, mins] = time.split(':').map(Number);
+              const totalMinutes = hours * 60 + mins + minutes;
+              const newHours = Math.floor(totalMinutes / 60);
+              const newMins = totalMinutes % 60;
+              return `${String(newHours).padStart(2, '0')}:${String(newMins).padStart(2, '0')}`;
+            };
+            
+            // Helper to format time for display
+            const formatTime = (time: string): string => {
+              const [hours, mins] = time.split(':').map(Number);
+              const period = hours >= 12 ? 'PM' : 'AM';
+              const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+              return `${String(displayHours).padStart(2, '0')}:${String(mins).padStart(2, '0')} ${period}`;
+            };
+            
+            let currentTime = schoolStartTime;
+            
+            for (let i = 1; i <= 8; i++) {
+              const periodStart = currentTime;
+              const periodEnd = addMinutesToTime(currentTime, periodDuration);
+              
+              periods.push({
+                number: i,
+                time: `${formatTime(periodStart)} - ${formatTime(periodEnd)}`,
+                start: periodStart,
+                end: periodEnd
+              });
+              
+              currentTime = periodEnd;
+              
+              // Add lunch break after the specified period
+              if (i === lunchPeriod) {
+                const lunchStart = currentTime;
+                const lunchEnd = addMinutesToTime(currentTime, lunchDuration);
+                periods.push({
+                  number: 'LUNCH',
+                  time: `${formatTime(lunchStart)} - ${formatTime(lunchEnd)}`,
+                  start: lunchStart,
+                  end: lunchEnd,
+                  isLunch: true
+                });
+                currentTime = lunchEnd;
+              }
+            }
+            
+            return periods;
+          };
+          
+          const periodsData = generatePeriods();
+          const periods = periodsData.map(p => p.number);
+          const periodTimes = periodsData.map(p => p.time);
 
           // Organize timetable data by day and period
           const timetableGrid: {[key: string]: {[key: number]: any}} = {};

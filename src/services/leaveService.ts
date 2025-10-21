@@ -5,6 +5,7 @@ export interface StudentLeaveRequestData {
   startDate: string; // YYYY-MM-DD
   endDate: string;   // YYYY-MM-DD
   reason: string;
+  proofImage?: string; // Optional: Cloudinary URL for proof image
 }
 
 export interface StudentLeaveResponse {
@@ -15,6 +16,7 @@ export interface StudentLeaveResponse {
   endDate: string;
   daysRequested: number;
   reason: string;
+  proofImage?: string; // Optional: Cloudinary URL for proof image
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
   classTeacherName?: string;
   classTeacherResponse?: string;

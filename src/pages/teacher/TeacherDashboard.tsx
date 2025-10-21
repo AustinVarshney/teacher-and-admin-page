@@ -2361,6 +2361,31 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
               <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>
                 Submitted: {request.createdAt ? new Date(request.createdAt).toLocaleString() : 'N/A'}
               </p>
+              {request.proofImage && (
+                <div style={{ marginTop: '1rem' }}>
+                  <p><strong>Proof Image:</strong></p>
+                  <a href={request.proofImage} target="_blank" rel="noopener noreferrer">
+                    <img 
+                      src={request.proofImage} 
+                      alt="Leave Proof" 
+                      style={{ 
+                        maxWidth: '300px', 
+                        maxHeight: '300px', 
+                        objectFit: 'cover', 
+                        borderRadius: '8px',
+                        border: '2px solid #e5e7eb',
+                        cursor: 'pointer',
+                        marginTop: '0.5rem',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }} 
+                      title="Click to view full size"
+                    />
+                  </a>
+                  <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                    Click image to view full size
+                  </p>
+                </div>
+              )}
             </div>
             {request.classTeacherResponse && (
               <div className="teacher-remarks" style={{ 

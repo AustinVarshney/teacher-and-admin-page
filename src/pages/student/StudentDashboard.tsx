@@ -18,6 +18,7 @@ import VideoLectureService, { VideoLecture as VideoLectureType } from '../../ser
 import galleryService from '../../services/galleryService';
 import PreviousSchoolingService, { PreviousSchoolingRecord } from '../../services/previousSchoolingService';
 import PeriodSettingsService, { PeriodSettings } from '../../services/periodSettingsService';
+import CloudinaryUploadWidget from '../../components/CloudinaryUploadWidget';
 
 interface StudentDashboardProps {
   onLogout: () => void;
@@ -33,13 +34,53 @@ type GalleryItem = { id: string; title: string; imageUrl: string; description?: 
 type VehicleRoute = { id: string; route: string; pickup: string; drop: string; note?: string; };
 type PreviousClassRecord = { id: string; classLabel: string; schoolName: string; passingYear: string; percentage: string; grade: string; gallery: GalleryItem[]; resultUrl?: string; certificateUrl?: string; };
 
+// Helper function to safely format dates
+const formatDateTime = (dateValue: any): string => {
+  if (!dateValue) return 'N/A';
+  
+  try {
+    // Handle different date formats
+    let date: Date;
+    
+    if (typeof dateValue === 'string') {
+      // Try parsing ISO string or other formats
+      date = new Date(dateValue);
+    } else if (typeof dateValue === 'number') {
+      // Handle timestamp
+      date = new Date(dateValue);
+    } else if (dateValue instanceof Date) {
+      date = dateValue;
+    } else if (typeof dateValue === 'object' && dateValue !== null) {
+      // Handle Java Date object format (e.g., {year: 2025, month: 10, day: 21, ...})
+      // This handles epoch timestamp from Java Date
+      if ('time' in dateValue) {
+        date = new Date(dateValue.time);
+      } else {
+        date = new Date(dateValue);
+      }
+    } else {
+      return 'N/A';
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'N/A';
+    }
+    
+    return date.toLocaleString();
+  } catch (error) {
+    console.error('Error formatting date:', dateValue, error);
+    return 'N/A';
+  }
+};
+
 const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'attendance' | 'holidays' | 'timetable' | 'events' | 'results' | 'fees' | 'gallery' | 'lectures' | 'queries' | 'enquiry' | 'leave' | 'transport' | 'tc' | 'history'>('home');
   const [querySubject, setQuerySubject] = useState('Mathematics');
   const [queryText, setQueryText] = useState('');
-  const [leaveImage, setLeaveImage] = useState<File | null>(null);
+  const [leaveProofImageUrl, setLeaveProofImageUrl] = useState<string>('');
   const [leaveSubject, setLeaveSubject] = useState('');
   const [leaveStartDate, setLeaveStartDate] = useState('');
   const [leaveEndDate, setLeaveEndDate] = useState('');
@@ -116,7 +157,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
           name: studentData.name || 'Student',
           currentClass: studentData.currentClass || studentData.className || 'N/A',
           pan: studentData.panNumber || 'N/A',
-          photo: studentData.photo || 'https://images.unsplash.com/photo-1607746882042-944635dfe10e?w=256&q=80&auto=format&fit=crop',
+          photo: studentData.photo || null,
           schoolName: 'Mauritius International School',
           schoolLogo: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-8IRdKonj2lw5KF7osJq3GRJSOrjKiKck0g&s',
           classId: classId,
@@ -722,11 +763,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
     }
   };
 
-  const handleLeaveUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setLeaveImage(file);
-  };
-
   const handleSubmitLeave = async () => {
     if (!leaveSubject.trim() || !leaveStartDate || !leaveEndDate) {
       alert('Please fill in all fields: reason, start date, and end date.');
@@ -737,13 +773,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
       await LeaveService.createStudentLeaveRequest({
         startDate: leaveStartDate,
         endDate: leaveEndDate,
-        reason: leaveSubject
+        reason: leaveSubject,
+        proofImage: leaveProofImageUrl || undefined
       });
       alert('Leave request submitted successfully to your class teacher!');
       setLeaveSubject('');
       setLeaveStartDate('');
       setLeaveEndDate('');
-      setLeaveImage(null);
+      setLeaveProofImageUrl('');
       // Refresh leave requests list
       fetchMyLeaveRequests();
     } catch (error: any) {
@@ -894,7 +931,23 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
             </div>
             <div className="student-profile">
               <div className="student-photo">
-                <img src={student?.photo || 'https://images.unsplash.com/photo-1607746882042-944635dfe10e?w=256&q=80&auto=format&fit=crop'} alt="Student" />
+                {student?.photo ? (
+                  <img src={student.photo} alt="Student" />
+                ) : (
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#e5e7eb',
+                    color: '#6b7280',
+                    fontSize: '2rem',
+                    borderRadius: '50%'
+                  }}>
+                    👤
+                  </div>
+                )}
               </div>
               <div className="student-info">
                 <h2>{student?.name || 'Student'}</h2>
@@ -1057,7 +1110,20 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
           <section className="profile-section" style={{marginBottom: '0'}}>
             <SectionHeader icon="👤" title="Student Profile" />
             <div className="profile-info">
-              <img className="profile-photo" src={student.photo} alt="Student" />
+              {student.photo ? (
+                <img className="profile-photo" src={student.photo} alt="Student" />
+              ) : (
+                <div className="profile-photo" style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#e5e7eb',
+                  color: '#6b7280',
+                  fontSize: '3rem'
+                }}>
+                  👤
+                </div>
+              )}
               <div className="profile-details">
                 <p><strong>Name:</strong> {student.name}</p>
                 <p><strong>Current Class:</strong> {student.currentClass} - Section {student.section}</p>
@@ -2272,7 +2338,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                             if (!img.createdAt) return 'Uploaded: Date unavailable';
                             // Handle format: 2025-10-21 01:40:31.233000
                             const dateStr = img.createdAt.toString();
-                            const [datePart, timePart] = dateStr.split(' ');
+                            const [datePart] = dateStr.split(' ');
 
                             return `Uploaded On : ${datePart}`
                             
@@ -2434,8 +2500,52 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
               </div>
               <div className="form-group">
                 <label>Upload supporting image (optional)</label>
-                <input type="file" accept="image/*" onChange={handleLeaveUpload} />
-                {leaveImage && <p style={{ marginTop: 8, color: '#555' }}>Selected: {leaveImage.name}</p>}
+                <CloudinaryUploadWidget
+                  uwConfig={{
+                    cloudName: 'dnmwonmud',
+                    uploadPreset: 'ml_default',
+                    multiple: false,
+                    folder: 'slms-leave-proofs',
+                    cropping: false,
+                    showAdvancedOptions: false,
+                    sources: ['local', 'camera'],
+                    clientAllowedFormats: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
+                    maxImageFileSize: 5242880, // 5MB
+                    maxFiles: 1,
+                    theme: 'default'
+                  }}
+                  onUploadSuccess={(results) => {
+                    if (results && results.length > 0) {
+                      const url = results[0].secureUrl;
+                      setLeaveProofImageUrl(url);
+                      console.log('Leave proof uploaded to Cloudinary:', url);
+                    }
+                  }}
+                  onUploadError={(error) => {
+                    console.error('Upload error:', error);
+                    alert('Failed to upload proof image. Please try again.');
+                  }}
+                  buttonText={leaveProofImageUrl ? '✓ Proof Uploaded - Change' : 'Upload Proof (Optional)'}
+                  disabled={false}
+                />
+                {leaveProofImageUrl && (
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <img 
+                      src={leaveProofImageUrl} 
+                      alt="Leave Proof" 
+                      style={{ 
+                        maxWidth: '200px', 
+                        maxHeight: '200px', 
+                        objectFit: 'cover', 
+                        borderRadius: '8px',
+                        border: '2px solid #10b981'
+                      }} 
+                    />
+                    <p style={{ color: '#10b981', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                      ✓ Proof image uploaded
+                    </p>
+                  </div>
+                )}
               </div>
               <button 
                 className="tc-btn" 
@@ -2482,12 +2592,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                         </div>
                       )}
                       <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                        Submitted on: {leave.createdAt ? new Date(leave.createdAt).toLocaleString() : 'N/A'}
+                        Submitted on: {formatDateTime(leave.createdAt)}
                       </p>
                       {leave.processedAt && (
                         <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                          Processed on: {new Date(leave.processedAt).toLocaleString()}
-                        </p>
+                          Processed on: {formatDateTime(leave.processedAt)}
+                        </p>  
                       )}
                     </div>
                   ))}

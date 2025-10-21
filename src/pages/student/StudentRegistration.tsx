@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import './StudentRegistration.css';
 import AuthService, { StudentRegistrationData } from '../../services/authService';
 import { DropdownService, ClassInfoResponse, SessionOption } from '../../services/dropdownService';
+import CloudinaryUploadWidget from '../../components/CloudinaryUploadWidget';
 
 interface StudentFormData {
   panNumber: string;
@@ -120,28 +121,7 @@ const StudentRegistration: React.FC = () => {
     }
   };
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Validate file size (max 2MB)
-      if (file.size > 2 * 1024 * 1024) {
-        setErrors(prev => ({ ...prev, photo: 'Photo size must be less than 2MB' }));
-        return;
-      }
-      
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setErrors(prev => ({ ...prev, photo: 'Please upload a valid image file' }));
-        return;
-      }
-      
-      setFormData(prev => ({
-        ...prev,
-        photo: file
-      }));
-      setErrors(prev => ({ ...prev, photo: '' }));
-    }
-  };
+  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string>('');
 
   const validateForm = (): boolean => {
     const newErrors: StudentRegistrationErrors = {};
@@ -237,17 +217,6 @@ const StudentRegistration: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const convertImageToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        resolve(reader.result as string);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -259,11 +228,8 @@ const StudentRegistration: React.FC = () => {
     setErrors({});
 
     try {
-      // Convert photo to base64 if provided
-      let photoBase64 = '';
-      if (formData.photo) {
-        photoBase64 = await convertImageToBase64(formData.photo);
-      }
+      // Use Cloudinary URL if already uploaded, otherwise photo is optional
+      const photoUrl = uploadedPhotoUrl || undefined;
 
       // Prepare registration data matching backend StudentRequestDto
       const registrationData: StudentRegistrationData = {
@@ -280,7 +246,7 @@ const StudentRegistration: React.FC = () => {
         previousSchool: formData.previousSchool.trim() || undefined,
         classId: parseInt(formData.classId),
         sessionId: parseInt(formData.sessionId),
-        photo: photoBase64 || undefined
+        photo: photoUrl
       };
 
       // Call backend API to register student
@@ -457,15 +423,54 @@ const StudentRegistration: React.FC = () => {
 
             <div className="form-group">
               <label htmlFor="photo">Recent Photo</label>
-              <input
-                type="file"
-                id="photo"
-                name="photo"
-                accept="image/*"
-                onChange={handlePhotoChange}
+              <CloudinaryUploadWidget
+                uwConfig={{
+                  cloudName: 'dnmwonmud',
+                  uploadPreset: 'ml_default',
+                  multiple: false,
+                  folder: 'slms-students',
+                  cropping: true,
+                  showAdvancedOptions: false,
+                  sources: ['local', 'camera'],
+                  clientAllowedFormats: ['jpg', 'jpeg', 'png', 'webp'],
+                  maxImageFileSize: 2097152, // 2MB
+                  maxFiles: 1,
+                  theme: 'default'
+                }}
+                onUploadSuccess={(results) => {
+                  if (results && results.length > 0) {
+                    const url = results[0].secureUrl;
+                    setUploadedPhotoUrl(url);
+                    setFormData(prev => ({ ...prev, photo: null }));
+                    setErrors(prev => ({ ...prev, photo: '' }));
+                    console.log('Student photo uploaded to Cloudinary:', url);
+                  }
+                }}
+                onUploadError={(error) => {
+                  console.error('Upload error:', error);
+                  setErrors(prev => ({ ...prev, photo: 'Failed to upload photo. Please try again.' }));
+                }}
+                buttonText={uploadedPhotoUrl ? '✓ Photo Uploaded - Upload Another' : 'Upload Photo (Optional)'}
                 disabled={isLoading}
-                className={errors.photo ? 'error' : ''}
               />
+              {uploadedPhotoUrl && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <img 
+                    src={uploadedPhotoUrl} 
+                    alt="Uploaded" 
+                    style={{ 
+                      width: '120px', 
+                      height: '120px', 
+                      objectFit: 'cover', 
+                      borderRadius: '8px',
+                      border: '2px solid #10b981'
+                    }} 
+                  />
+                  <p style={{ color: '#10b981', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+                    ✓ Photo uploaded successfully
+                  </p>
+                </div>
+              )}
               {errors.photo && <span className="error-message">{errors.photo}</span>}
               <small>Upload passport-size photo (JPG/PNG, max 2MB) - Optional</small>
             </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './StudentRegistrationForm.css';
 import AuthService, { StudentRegistrationData } from '../../services/authService';
 import { DropdownService, ClassInfoResponse, SessionOption } from '../../services/dropdownService';
+import CloudinaryUploadWidget from '../../components/CloudinaryUploadWidget';
 
 interface StudentFormData {
   panNumber: string;
@@ -70,6 +71,7 @@ const StudentRegistrationForm: React.FC<StudentRegistrationFormProps> = ({ onReg
   const [loadingDropdowns, setLoadingDropdowns] = useState(true);
   const [dropdownError, setDropdownError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string>('');
 
   // Fetch classes and sessions on component mount
   // Fetch dropdown data on mount and when component refreshes
@@ -152,37 +154,7 @@ const StudentRegistrationForm: React.FC<StudentRegistrationFormProps> = ({ onReg
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    if (file) {
-      // Validate file size (max 2MB)
-      if (file.size > 2 * 1024 * 1024) {
-        setErrors(prev => ({ ...prev, photo: 'Photo size must be less than 2MB' }));
-        return;
-      }
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setErrors(prev => ({ ...prev, photo: 'Please select a valid image file' }));
-        return;
-      }
-    }
-    setFormData(prev => ({ ...prev, photo: file }));
-    setErrors(prev => ({ ...prev, photo: '' }));
-  };
 
-  const convertImageToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const base64String = reader.result as string;
-        // Remove the data:image/...;base64, prefix
-        const base64Data = base64String.split(',')[1];
-        resolve(base64Data);
-      };
-      reader.onerror = error => reject(error);
-    });
-  };
 
   const validateForm = (): boolean => {
     const newErrors: StudentRegistrationErrors = {};
@@ -292,11 +264,8 @@ const StudentRegistrationForm: React.FC<StudentRegistrationFormProps> = ({ onReg
     setSuccessMessage('');
 
     try {
-      // Convert photo to base64 if present
-      let photoBase64: string | undefined = undefined;
-      if (formData.photo) {
-        photoBase64 = await convertImageToBase64(formData.photo);
-      }
+      // Use Cloudinary URL if already uploaded
+      const photoUrl = uploadedPhotoUrl || undefined;
 
       // Prepare registration data matching backend StudentRequestDto
       const registrationData: StudentRegistrationData = {
@@ -313,7 +282,7 @@ const StudentRegistrationForm: React.FC<StudentRegistrationFormProps> = ({ onReg
         previousSchool: formData.previousSchool.trim() || undefined,
         classId: parseInt(formData.classId),
         sessionId: parseInt(formData.sessionId),
-        photo: photoBase64 || undefined
+        photo: photoUrl
       };
 
       // Call backend API to register student
@@ -543,19 +512,56 @@ const StudentRegistrationForm: React.FC<StudentRegistrationFormProps> = ({ onReg
               Student Photo <span className="optional">(Optional)</span>
               <span className="field-hint">Max size: 2MB, Format: JPG, PNG</span>
             </label>
-            <input
-              type="file"
-              id="photo"
-              name="photo"
-              accept="image/*"
-              onChange={handleFileChange}
-              className={errors.photo ? 'error' : ''}
+            <CloudinaryUploadWidget
+              uwConfig={{
+                cloudName: 'dnmwonmud',
+                uploadPreset: 'ml_default',
+                multiple: false,
+                folder: 'slms-students',
+                cropping: true,
+                showAdvancedOptions: false,
+                sources: ['local', 'camera'],
+                clientAllowedFormats: ['jpg', 'jpeg', 'png', 'webp'],
+                maxImageFileSize: 2097152, // 2MB
+                maxFiles: 1,
+                theme: 'default'
+              }}
+              onUploadSuccess={(results) => {
+                if (results && results.length > 0) {
+                  const url = results[0].secureUrl;
+                  setUploadedPhotoUrl(url);
+                  setFormData(prev => ({ ...prev, photo: null }));
+                  setErrors(prev => ({ ...prev, photo: '' }));
+                  console.log('Student photo uploaded to Cloudinary:', url);
+                }
+              }}
+              onUploadError={(error) => {
+                console.error('Upload error:', error);
+                setErrors(prev => ({ ...prev, photo: 'Failed to upload photo. Please try again.' }));
+              }}
+              buttonText={uploadedPhotoUrl ? '✓ Photo Uploaded - Upload Another' : 'Upload Photo (Optional)'}
               disabled={isLoading}
             />
-            {errors.photo && <span className="error-message">{errors.photo}</span>}
-            {formData.photo && (
-              <span className="file-selected">✓ {formData.photo.name}</span>
+            {uploadedPhotoUrl && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <img 
+                  src={uploadedPhotoUrl} 
+                  alt="Uploaded" 
+                  style={{ 
+                    width: '120px', 
+                    height: '120px', 
+                    objectFit: 'cover', 
+                    borderRadius: '8px',
+                    border: '2px solid #10b981',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }} 
+                />
+                <p style={{ color: '#10b981', fontSize: '0.9rem', marginTop: '0.5rem', fontWeight: '500' }}>
+                  ✓ Photo uploaded successfully
+                </p>
+              </div>
             )}
+            {errors.photo && <span className="error-message">{errors.photo}</span>}
           </div>
         </div>
 

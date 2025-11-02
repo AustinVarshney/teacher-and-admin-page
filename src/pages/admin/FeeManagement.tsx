@@ -63,8 +63,8 @@ const FeeManagement: React.FC = () => {
   };
 
   const handlePayFee = async () => {
-    if (!selectedMonth || !selectedStudent || !receiptNumber.trim()) {
-      setErrorMessage('Please provide receipt number');
+    if (!selectedMonth || !selectedStudent) {
+      setErrorMessage('Please select a month');
       return;
     }
 
@@ -84,7 +84,7 @@ const FeeManagement: React.FC = () => {
         month: selectedMonth.month,
         sessionId: selectedStudent.sessionId,
         classId: selectedStudent.classId,
-        receiptNumber: receiptNumber.trim()
+        receiptNumber: receiptNumber.trim() || '' // Auto-generate if empty
       };
 
       const response = await FeeService.processFeePayment(paymentData);
@@ -311,10 +311,10 @@ const FeeManagement: React.FC = () => {
                     </div>
 
                     <div className="form-group">
-                      <label>Receipt Number *</label>
+                      <label>Receipt Number (Optional - Auto-generated if empty)</label>
                       <input
                         type="text"
-                        placeholder="Enter receipt number (e.g., REC2024001)"
+                        placeholder="Leave empty for auto-generation or enter custom (e.g., REC2024001)"
                         value={receiptNumber}
                         onChange={(e) => setReceiptNumber(e.target.value)}
                         className="receipt-input"
@@ -334,7 +334,7 @@ const FeeManagement: React.FC = () => {
                       <button
                         className="btn-pay"
                         onClick={handlePayFee}
-                        disabled={paymentLoading || !receiptNumber.trim()}
+                        disabled={paymentLoading}
                       >
                         {paymentLoading ? 'Processing...' : 'Process Payment'}
                       </button>

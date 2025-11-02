@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import CloudinaryUploadWidget from '../components/CloudinaryUploadWidget';
 import './AdminRegister.css';
 
 interface AdminRegisterForm {
@@ -18,6 +19,8 @@ interface AdminRegisterForm {
   schoolWebsite: string;
   schoolContactNumber: string;
   schoolAddress: string;
+  schoolLogo: string;
+  schoolTagline: string;
 }
 
 const AdminRegister: React.FC = () => {
@@ -48,7 +51,9 @@ const AdminRegister: React.FC = () => {
     schoolEmail: '',
     schoolWebsite: '',
     schoolContactNumber: '',
-    schoolAddress: ''
+    schoolAddress: '',
+    schoolLogo: '',
+    schoolTagline: ''
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -161,7 +166,9 @@ const AdminRegister: React.FC = () => {
         schoolEmail: formData.schoolEmail,
         schoolWebsite: formData.schoolWebsite || '',
         schoolContactNumber: formData.schoolContactNumber,
-        schoolAddress: formData.schoolAddress
+        schoolAddress: formData.schoolAddress,
+        schoolLogo: formData.schoolLogo || '',
+        schoolTagline: formData.schoolTagline || ''
       };
 
       // Use fetch directly to avoid axios interceptors that add auth headers
@@ -450,6 +457,100 @@ const AdminRegister: React.FC = () => {
                   placeholder="Enter complete school address"
                   rows={4}
                   required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="schoolLogo">
+                  School Logo
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <CloudinaryUploadWidget
+                    uwConfig={{
+                      cloudName: 'dnmwonmud',
+                      uploadPreset: 'ml_default',
+                      multiple: false,
+                      folder: 'slms_gallery',
+                      clientAllowedFormats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+                      maxImageFileSize: 2000000, // 2MB
+                      cropping: true,
+                      showAdvancedOptions: false,
+                      sources: ['local', 'camera'],
+                      theme: 'minimal'
+                    }}
+                    onUploadSuccess={(results) => {
+                      if (results && results.length > 0) {
+                        setFormData(prev => ({
+                          ...prev,
+                          schoolLogo: results[0].secureUrl
+                        }));
+                        setSuccess('School logo uploaded successfully!');
+                        setTimeout(() => setSuccess(''), 3000);
+                      }
+                    }}
+                    onUploadError={(error) => {
+                      setError('Failed to upload school logo. Please try again.');
+                      console.error('Upload error:', error);
+                    }}
+                    buttonText={formData.schoolLogo ? 'Change Logo' : 'Upload Logo'}
+                  />
+                  {formData.schoolLogo && (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.5rem',
+                      padding: '0.5rem',
+                      background: '#f0f9ff',
+                      borderRadius: '6px',
+                      border: '1px solid #bae6fd'
+                    }}>
+                      <img 
+                        src={formData.schoolLogo} 
+                        alt="School logo preview" 
+                        style={{ 
+                          width: '60px', 
+                          height: '60px', 
+                          objectFit: 'contain',
+                          borderRadius: '4px'
+                        }} 
+                      />
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: 0, fontSize: '0.875rem', color: '#0369a1', fontWeight: 500 }}>
+                          Logo uploaded ✓
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, schoolLogo: '' }))}
+                        style={{
+                          padding: '0.25rem 0.75rem',
+                          background: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem'
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <small className="form-hint">Upload your school logo (optional)</small>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="schoolTagline">
+                  School Tagline
+                </label>
+                <input
+                  type="text"
+                  id="schoolTagline"
+                  name="schoolTagline"
+                  value={formData.schoolTagline}
+                  onChange={handleInputChange}
+                  placeholder="Enter school tagline or motto (optional)"
                 />
               </div>
 

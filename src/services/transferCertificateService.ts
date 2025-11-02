@@ -53,6 +53,21 @@ export class TransferCertificateService {
       throw new Error(message);
     }
   }
+  
+  // Admin: Get processed (approved/rejected) TC requests from last month
+  static async getProcessedRequestsFromLastMonth() {
+    try {
+      const response = await api.get('/tc/processed/last-month');
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to fetch processed requests from last month');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch processed requests from last month';
+      throw new Error(message);
+    }
+  }
 
   // Admin: Approve or reject TC request directly
   static async processRequest(requestId: number, decision: 'APPROVED' | 'REJECTED', adminReply: string) {

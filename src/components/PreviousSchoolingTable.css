@@ -1,0 +1,434 @@
+/* Previous Schooling Container */
+.previous-schooling-container {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-top: 1.5rem;
+}
+
+/* Header Section */
+.previous-schooling-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 3px solid #667eea;
+}
+
+.header-info h2 {
+  margin: 0 0 0.5rem 0;
+  color: #1f2937;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.header-info p {
+  margin: 0.25rem 0;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+/* Table Wrapper */
+.previous-schooling-table-wrapper {
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+/* Previous Schooling Table */
+.previous-schooling-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.previous-schooling-table thead tr:first-child th {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1rem 0.75rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.previous-schooling-table thead tr:first-child th:last-child {
+  border-right: none;
+}
+
+.session-header {
+  text-align: left !important;
+  min-width: 150px;
+  position: sticky;
+  left: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  z-index: 2;
+}
+
+.class-header {
+  min-width: 100px;
+}
+
+.status-header {
+  min-width: 120px;
+}
+
+.passing-year-header {
+  min-width: 100px;
+}
+
+.attendance-header {
+  min-width: 200px;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.performance-header {
+  min-width: 150px;
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+.exams-header {
+  min-width: 180px;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Subheader Row */
+.subheader-row th {
+  background: #f3f4f6 !important;
+  color: #4b5563;
+  padding: 0.5rem 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  border-right: 1px solid #e5e7eb;
+}
+
+.marks-subheader {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+/* Table Body */
+.previous-schooling-table tbody tr {
+  border-bottom: 1px solid #e5e7eb;
+  transition: background-color 0.2s;
+}
+
+.previous-schooling-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.record-row td {
+  padding: 0.75rem;
+  text-align: center;
+  border-right: 1px solid #e5e7eb;
+  vertical-align: middle;
+}
+
+.session-name {
+  text-align: left !important;
+  font-weight: 600;
+  color: #1f2937;
+  position: sticky;
+  left: 0;
+  background: white;
+  z-index: 1;
+  border-right: 2px solid #d1d5db !important;
+}
+
+.previous-schooling-table tbody tr:hover .session-name {
+  background-color: #f9fafb;
+}
+
+/* Class Badge */
+.class-badge {
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+}
+
+/* Status Badge */
+.status-badge {
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.status-completed {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status-transferred {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-promoted {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+/* Passing Year */
+.passing-year {
+  font-weight: 600;
+  color: #374151;
+}
+
+/* Attendance Cells */
+.attendance-cell {
+  color: #059669;
+  font-weight: 600;
+}
+
+.attendance-cell.absent {
+  color: #dc2626;
+}
+
+.attendance-percentage {
+  background-color: #f0fdf4;
+  font-weight: 700;
+  color: #15803d;
+  font-size: 0.95rem;
+}
+
+/* Performance Cells */
+.performance-percentage {
+  background-color: #eff6ff;
+  font-weight: 700;
+  color: #1d4ed8;
+  font-size: 0.95rem;
+}
+
+/* Grade Badge */
+.grade-badge {
+  display: inline-block;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.grade-aplus,
+.grade-a {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.grade-bplus,
+.grade-b {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.grade-c {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.grade-d,
+.grade-e,
+.grade-f {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+/* Exam Details */
+.exam-details-cell {
+  padding: 0.5rem !important;
+}
+
+.exam-details {
+  text-align: left;
+}
+
+.exam-summary {
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  list-style: none;
+  text-align: center;
+}
+
+.exam-summary::-webkit-details-marker {
+  display: none;
+}
+
+.exam-summary:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.exam-list {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background-color: #f9fafb;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.exam-item {
+  padding: 0.75rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.exam-name {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 0.9rem;
+}
+
+.exam-marks {
+  font-size: 0.85rem;
+  color: #6b7280;
+  grid-column: 1;
+}
+
+.exam-performance {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.exam-percentage {
+  font-weight: 700;
+  color: #3b82f6;
+  font-size: 0.95rem;
+}
+
+.exam-grade {
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.no-exams {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* Summary Footer */
+.records-summary {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  border-radius: 12px;
+  border: 2px solid #d1d5db;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.summary-label {
+  font-size: 0.9rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.summary-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #1f2937;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .previous-schooling-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .previous-schooling-table {
+    font-size: 0.8rem;
+  }
+
+  .previous-schooling-table thead tr:first-child th {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .record-row td {
+    padding: 0.5rem;
+  }
+
+  .session-name {
+    min-width: 120px;
+    font-size: 0.85rem;
+  }
+
+  .records-summary {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .summary-item {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .previous-schooling-container {
+    box-shadow: none;
+  }
+
+  .previous-schooling-table {
+    border: 1px solid #000;
+  }
+
+  .previous-schooling-table thead tr:first-child th {
+    background: #333 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .session-name {
+    background: white !important;
+  }
+
+  .exam-summary {
+    display: none;
+  }
+
+  .exam-list {
+    display: flex !important;
+  }
+}

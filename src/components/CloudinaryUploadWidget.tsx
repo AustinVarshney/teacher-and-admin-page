@@ -85,12 +85,19 @@ const CloudinaryUploadWidget: React.FC<CloudinaryUploadWidgetProps> = ({
               height: result.info.height,
               originalFilename: result.info.original_filename,
             };
-            console.log('✅ Adding upload result:', uploadResult);
+            console.log('✅ Upload successful:', uploadResult);
             uploadedResults.current.push(uploadResult);
+            
+            // For single upload mode, send result immediately
+            if (!uwConfig.multiple) {
+              console.log('🎯 Single upload mode - sending immediate result');
+              onUploadSuccess([uploadResult]);
+              uploadedResults.current = [];
+            }
           }
 
-          // Handle widget close event
-          if (result.event === 'close') {
+          // Handle widget close event for multiple uploads
+          if (result.event === 'close' && uwConfig.multiple) {
             console.log('🚪 Widget closed. Current uploads:', uploadedResults.current.length);
             // If there are pending uploads, send them
             if (uploadedResults.current.length > 0) {
@@ -101,26 +108,14 @@ const CloudinaryUploadWidget: React.FC<CloudinaryUploadWidgetProps> = ({
             }
           }
 
-          // When upload queue is complete, return all results
-          if (result.event === 'queues-end') {
+          // When upload queue is complete for multiple uploads
+          if (result.event === 'queues-end' && uwConfig.multiple) {
             console.log('🏁 Upload queue ended. Total uploads:', uploadedResults.current.length);
             if (uploadedResults.current.length > 0) {
               const resultsToSend = [...uploadedResults.current];
               console.log('📤 Sending results to parent:', resultsToSend);
               onUploadSuccess(resultsToSend);
               uploadedResults.current = []; // Reset for next upload
-            } else {
-              console.warn('⚠️ Queue ended but no uploads recorded');
-            }
-          }
-
-          // Handle single file upload completion (non-multiple mode)
-          if (result.event === 'success' && !uwConfig.multiple) {
-            console.log('🎯 Single upload mode - sending immediate result');
-            const singleResult = uploadedResults.current[uploadedResults.current.length - 1];
-            if (singleResult) {
-              onUploadSuccess([singleResult]);
-              uploadedResults.current = [];
             }
           }
         }

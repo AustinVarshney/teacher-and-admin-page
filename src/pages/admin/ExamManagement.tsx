@@ -137,15 +137,37 @@ const ExamManagement: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleOpenAssignModal = (examTypeId?: number) => {
-    setAssignFormData({
-      examTypeId: examTypeId || 0,
-      selectedClasses: [],
-      maxMarks: 100,
-      passingMarks: 40,
-      examDate: ''
-    });
-    setShowAssignModal(true);
+  const handleOpenAssignModal = async (examTypeId?: number) => {
+    try {
+      let preSelectedClasses: number[] = [];
+      
+      // If editing an existing exam type assignment, fetch already assigned classes
+      if (examTypeId && examTypeId > 0) {
+        const assignedClasses = await ClassExamService.getClassesByExamType(examTypeId);
+        preSelectedClasses = assignedClasses.map(ce => ce.classId);
+        console.log('Pre-selected classes for exam type', examTypeId, ':', preSelectedClasses);
+      }
+      
+      setAssignFormData({
+        examTypeId: examTypeId || 0,
+        selectedClasses: preSelectedClasses,
+        maxMarks: 100,
+        passingMarks: 40,
+        examDate: ''
+      });
+      setShowAssignModal(true);
+    } catch (error) {
+      console.error('Error fetching assigned classes:', error);
+      // Still open modal even if fetch fails
+      setAssignFormData({
+        examTypeId: examTypeId || 0,
+        selectedClasses: [],
+        maxMarks: 100,
+        passingMarks: 40,
+        examDate: ''
+      });
+      setShowAssignModal(true);
+    }
   };
 
   const handleCloseModal = () => {
@@ -228,17 +250,47 @@ const ExamManagement: React.FC = () => {
 
     try {
       setLoading(true);
-      await ClassExamService.assignExamToClasses({
-        examTypeId: assignFormData.examTypeId,
-        classExams: assignFormData.selectedClasses.map(classId => ({
-          classId,
-          maxMarks: assignFormData.maxMarks,
-          passingMarks: assignFormData.passingMarks,
-          examDate: assignFormData.examDate || undefined // Include exam date if provided
-        }))
-      });
+      
+      // Get currently assigned classes for this exam type
+      const currentlyAssigned = await ClassExamService.getClassesByExamType(assignFormData.examTypeId);
+      const currentClassIds = currentlyAssigned.map(ce => ce.classId);
+      const selectedClassIds = assignFormData.selectedClasses;
+      
+      // Find classes to unassign (were assigned but now unchecked)
+      const classesToRemove = currentClassIds.filter(id => !selectedClassIds.includes(id));
+      
+      // Find classes to assign (newly checked or need update)
+      const classesToAssign = selectedClassIds;
+      
+      // STEP 1: Delete unselected classes first and wait for all deletions to complete
+      if (classesToRemove.length > 0) {
+        console.log('Deleting unassigned classes:', classesToRemove);
+        await Promise.all(
+          classesToRemove.map(classId => 
+            ClassExamService.deleteClassExam(classId, assignFormData.examTypeId)
+              .then(() => console.log(`Successfully unassigned exam from class ${classId}`))
+              .catch(err => console.error(`Failed to unassign class ${classId}:`, err))
+          )
+        );
+        // Small delay to ensure database commits the deletions
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // STEP 2: Assign/update selected classes after deletions are complete
+      if (classesToAssign.length > 0) {
+        console.log('Assigning exam to classes:', classesToAssign);
+        await ClassExamService.assignExamToClasses({
+          examTypeId: assignFormData.examTypeId,
+          classExams: classesToAssign.map(classId => ({
+            classId,
+            maxMarks: assignFormData.maxMarks,
+            passingMarks: assignFormData.passingMarks,
+            examDate: assignFormData.examDate || undefined
+          }))
+        });
+      }
 
-      alert('Exam assigned to classes successfully!');
+      alert('Exam assignments updated successfully!');
       handleCloseAssignModal();
       
       // Reload exam types and class exams to reflect the new assignments

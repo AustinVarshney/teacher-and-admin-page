@@ -159,7 +159,7 @@ const AppContent = () => {
         if (isAuth && storedUserType) {
           setIsAuthenticated(true);
           setUserType(storedUserType);
-          console.log('Session restored:', { userType: storedUserType });
+          // console.log('Session restored:', { userType: storedUserType });
         } else {
           // Clear any stale data
           AuthService.logout();

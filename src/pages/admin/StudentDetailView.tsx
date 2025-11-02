@@ -3,6 +3,8 @@ import { Student, FeeCatalog } from '../../types/admin';
 import './StudentDetailView.css';
 import { StudentService } from '../../services/studentService';
 import FeeService from '../../services/feeService';
+import { api } from '../../services/api';
+import { generateReportCard } from '../../utils/pdfGenerator';
 
 interface StudentDetailViewProps {
   student: Student;
@@ -19,6 +21,9 @@ const StudentDetailView: React.FC<StudentDetailViewProps> = ({ student, feeCatal
   const [success, setSuccess] = useState<string | null>(null);
   const [feeCatalog, setFeeCatalog] = useState<FeeCatalog>(initialFeeCatalog);
   const [isGeneratingFees, setIsGeneratingFees] = useState(false);
+  const [showResultsModal, setShowResultsModal] = useState(false);
+  const [studentResults, setStudentResults] = useState<any[]>([]);
+  const [loadingResults, setLoadingResults] = useState(false);
   
   // Editable student data
   const [editedStudent, setEditedStudent] = useState<Student>({ ...student });
@@ -36,13 +41,13 @@ const StudentDetailView: React.FC<StudentDetailViewProps> = ({ student, feeCatal
       monthlyFees: feeCatalog.monthlyFees
     });
     
+    // Don't auto-generate fees - let admin manually trigger if needed
     // Check if fees are truly empty (length 0) OR all items are empty objects
     const hasValidFees = feeCatalog.monthlyFees.length > 0 && 
                          feeCatalog.monthlyFees.some(fee => fee.month && fee.amount);
     
-    if (!hasValidFees && !isGeneratingFees) {
-      console.log('No valid fees found, generating...');
-      generateFeesForStudent();
+    if (!hasValidFees) {
+      console.log('No valid fees found. Admin can manually generate if needed.');
     }
   }, []);
 
@@ -50,6 +55,7 @@ const StudentDetailView: React.FC<StudentDetailViewProps> = ({ student, feeCatal
   const generateFeesForStudent = async () => {
     try {
       setIsGeneratingFees(true);
+      setError(null);
       await FeeService.generateFeesForStudent(student.id);
       
       // Refresh fee catalog
@@ -59,7 +65,19 @@ const StudentDetailView: React.FC<StudentDetailViewProps> = ({ student, feeCatal
       setTimeout(() => setSuccess(null), 3000);
     } catch (error: any) {
       console.error('Failed to generate fees:', error);
-      setError(error.message || 'Failed to generate fees');
+      // Check if it's a duplicate entry error
+      if (error.message && error.message.includes('already exist')) {
+        setError('Fee records already exist for this student.');
+        // Try to refresh the catalog to show existing fees
+        try {
+          const updatedCatalog = await FeeService.getFeeCatalogByPan(student.id);
+          setFeeCatalog(updatedCatalog);
+        } catch (refreshError) {
+          console.error('Failed to refresh fee catalog:', refreshError);
+        }
+      } else {
+        setError(error.message || 'Failed to generate fees');
+      }
       setTimeout(() => setError(null), 5000);
     } finally {
       setIsGeneratingFees(false);
@@ -647,10 +665,155 @@ const StudentDetailView: React.FC<StudentDetailViewProps> = ({ student, feeCatal
       </div>
       
       <div className="academic-actions">
-        <button className="action-btn">View Results</button>
-        <button className="action-btn">Update Academic Record</button>
-        <button className="action-btn">Generate Report Card</button>
+        <button 
+          className="action-btn"
+          onClick={async () => {
+            try {
+              setLoadingResults(true);
+              setShowResultsModal(true);
+              const response = await api.get(`/results/student/${student.id}`);
+              if (response.data && response.data.examResults) {
+                setStudentResults(response.data.examResults);
+              } else {
+                setStudentResults([]);
+              }
+            } catch (err: any) {
+              console.error('Failed to load results:', err);
+              alert(err.message || 'Failed to load results');
+              setShowResultsModal(false);
+            } finally {
+              setLoadingResults(false);
+            }
+          }}
+        >
+          View Results
+        </button>
+
+        <button 
+          className="action-btn"
+          onClick={async () => {
+            try {
+              // Fetch student results
+              const response = await api.get(`/results/student/${student.id}`);
+              
+              if (!response.data || !response.data.examResults || response.data.examResults.length === 0) {
+                alert('No exam results found for this student. Cannot generate report card.');
+                return;
+              }
+
+              // Get current session year
+              const currentYear = new Date().getFullYear();
+              const sessionYear = `${currentYear}-${currentYear + 1}`;
+
+              // Prepare data for PDF generation
+              const reportCardData = {
+                studentInfo: {
+                  name: student.name,
+                  id: student.id,
+                  className: student.currentClass,
+                  section: student.section,
+                  rollNumber: student.classRollNumber,
+                  fatherName: student.parentName || 'N/A',
+                  dateOfBirth: student.dateOfBirth || 'N/A'
+                },
+                examResults: response.data.examResults,
+                sessionYear: sessionYear,
+                schoolName: 'School Management System', // Can be fetched from settings
+                generatedDate: new Date().toLocaleDateString('en-IN', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })
+              };
+
+              // Generate PDF
+              await generateReportCard(reportCardData);
+              alert('Report card generated successfully!');
+            } catch (err: any) {
+              console.error('Failed to generate report card:', err);
+              alert(err.message || 'Failed to generate report card. Please try again.');
+            }
+          }}
+        >
+          Generate Report Card
+        </button>
       </div>
+
+      {/* Results Modal */}
+      {showResultsModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000
+        }}>
+          <div style={{
+            background: 'white',
+            padding: '2rem',
+            borderRadius: '12px',
+            maxWidth: '800px',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            width: '90%'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <h3>Exam Results - {student.name}</h3>
+              <button onClick={() => setShowResultsModal(false)} style={{ fontSize: '1.5rem', border: 'none', background: 'none', cursor: 'pointer' }}>×</button>
+            </div>
+            {loadingResults ? (
+              <p>Loading results...</p>
+            ) : studentResults.length === 0 ? (
+              <p>No exam results found for this student.</p>
+            ) : (
+              <div>
+                {studentResults.map((exam: any, idx: number) => (
+                  <div key={idx} style={{ marginBottom: '1.5rem', border: '1px solid #ddd', padding: '1rem', borderRadius: '8px' }}>
+                    <h4>{exam.examName}</h4>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: '#f3f4f6' }}>
+                          <th style={{ padding: '0.5rem', textAlign: 'left', border: '1px solid #ddd' }}>Subject</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'center', border: '1px solid #ddd' }}>Marks</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'center', border: '1px solid #ddd' }}>Max Marks</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'center', border: '1px solid #ddd' }}>Grade</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {exam.subjectScores?.map((subject: any, sIdx: number) => (
+                          <tr key={sIdx}>
+                            <td style={{ padding: '0.5rem', border: '1px solid #ddd' }}>{subject.subjectName}</td>
+                            <td style={{ padding: '0.5rem', textAlign: 'center', border: '1px solid #ddd' }}>
+                              {subject.marks !== null ? subject.marks : '-'}
+                            </td>
+                            <td style={{ padding: '0.5rem', textAlign: 'center', border: '1px solid #ddd' }}>{subject.maxMarks}</td>
+                            <td style={{ padding: '0.5rem', textAlign: 'center', border: '1px solid #ddd' }}>
+                              <span style={{ color: subject.grade !== 'Not Added' && subject.marks !== null ? '#10b981' : '#6b7280' }}>
+                                {subject.grade || 'Pending'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p style={{ marginTop: '0.5rem', fontWeight: 'bold' }}>
+                      Total: {exam.obtainedMarks} / {exam.totalMarks}
+                    </p>
+                    <p style={{ marginTop: '0.25rem', color: '#6b7280' }}>
+                      Percentage: {exam.percentage?.toFixed(2)}% | Overall Grade: {exam.overallGrade}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 

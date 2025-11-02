@@ -69,8 +69,6 @@ export class TimetableService {
   // Get timetable by class
   static async getTimetableByClass(classId: string | number, day?: string) {
     try {
-      console.log('TimetableService.getTimetableByClass called with:', classId, 'Type:', typeof classId);
-      
       if (!classId || classId === 'undefined' || classId === undefined) {
         throw new Error('Invalid classId provided to getTimetableByClass');
       }
@@ -92,7 +90,6 @@ export class TimetableService {
           teacherName: slot.teacherName || 'Unknown Teacher'
         }));
         
-        console.log('📅 Mapped timetable data:', mappedData);
         return mappedData;
       }
       throw new Error(response.data.message || 'Failed to fetch class timetable');

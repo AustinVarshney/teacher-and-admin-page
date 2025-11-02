@@ -145,16 +145,8 @@ export class SessionService {
       return { valid: false, error: 'End date must be after start date' };
     }
     
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays < 180) {
-      return { valid: false, error: 'Session must be at least 6 months (180 days)' };
-    }
-    
-    if (diffDays > 500) {
-      return { valid: false, error: 'Session cannot exceed 500 days' };
-    }
+    // Removed: 12-month constraint and overlap check
+    // Sessions can now be of any length (as long as end > start)
     
     return { valid: true };
   }

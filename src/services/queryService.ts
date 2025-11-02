@@ -31,7 +31,7 @@ export interface TeacherQueryRequest {
 }
 
 export interface TeacherQueryResponse {
-  id?: number;
+  id: number;
   adminId?: number;
   adminName?: string;
   subject: string;

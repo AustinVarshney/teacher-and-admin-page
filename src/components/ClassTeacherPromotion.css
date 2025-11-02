@@ -1,0 +1,371 @@
+/* Promotion Container */
+.promotion-container {
+  padding: 2rem;
+  background: #f9fafb;
+  min-height: 100vh;
+}
+
+.promotion-header {
+  margin-bottom: 2rem;
+}
+
+.promotion-header h2 {
+  margin: 0 0 0.5rem 0;
+  color: #1f2937;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.promotion-header p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+/* Alerts */
+.alert {
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-weight: 500;
+}
+
+.alert-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.alert-success {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+
+/* Content Layout */
+.promotion-content {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 2rem;
+}
+
+/* Class Selection Panel */
+.class-selection-panel {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: fit-content;
+}
+
+.class-selection-panel h3 {
+  margin: 0 0 1rem 0;
+  color: #1f2937;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.class-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.class-card {
+  background: #f3f4f6;
+  border: 2px solid transparent;
+  padding: 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-align: left;
+}
+
+.class-card:hover {
+  background: #e5e7eb;
+  border-color: #667eea;
+}
+
+.class-card.selected {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: #667eea;
+}
+
+.class-name {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #1f2937;
+}
+
+.class-card.selected .class-name {
+  color: white;
+}
+
+.class-section {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.class-card.selected .class-section {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Students Panel */
+.students-panel {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.panel-header h3 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.selection-info {
+  color: #667eea;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+/* Table Actions */
+.table-actions {
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-secondary:hover {
+  background: #e5e7eb;
+}
+
+/* Students Table */
+.students-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 2rem;
+}
+
+.students-table thead {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.students-table th {
+  padding: 1rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.students-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.students-table tbody tr {
+  transition: background-color 0.2s;
+}
+
+.students-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.students-table tbody tr.selected-row {
+  background-color: #eff6ff;
+}
+
+.student-name {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.fee-details {
+  font-size: 0.85rem;
+}
+
+.fee-details .overdue {
+  color: white;
+  font-weight: 600;
+  /* display: block; */
+  margin-bottom: 0.25rem;
+}
+
+.fee-details .pending {
+  color: white;
+  font-weight: 600;
+  /* display: block; */
+}
+
+.fee-details .paid {
+  color: white;
+  font-weight: 600;
+}
+
+.percentage {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #1f2937;
+}
+
+/* Promotion Section */
+.promotion-section {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #bfdbfe;
+}
+
+.promotion-section h4 {
+  margin: 0 0 1rem 0;
+  color: #1e40af;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.promotion-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.form-group {
+  flex: 1;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #374151;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.class-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: white;
+  color: #1f2937;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.class-select:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.btn-promote {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.3s;
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.btn-promote:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-promote:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-promote:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Loading & No Data States */
+.loading,
+.no-data {
+  text-align: center;
+  padding: 3rem;
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .promotion-content {
+    grid-template-columns: 1fr;
+  }
+
+  .promotion-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-promote {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .promotion-container {
+    padding: 1rem;
+  }
+
+  .students-table {
+    font-size: 0.85rem;
+  }
+
+  .students-table th,
+  .students-table td {
+    padding: 0.5rem;
+  }
+
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .status-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+  }
+}

@@ -1,0 +1,289 @@
+/* Marksheet Container */
+.marksheet-container {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Header Section */
+.marksheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 3px solid #667eea;
+}
+
+.student-info h2 {
+  margin: 0 0 0.5rem 0;
+  color: #1f2937;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.student-info p {
+  margin: 0.25rem 0;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.download-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.download-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+}
+
+.download-btn:active {
+  transform: translateY(0);
+}
+
+/* Table Wrapper */
+.marksheet-table-wrapper {
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+/* Marksheet Table */
+.marksheet-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.marksheet-table thead tr:first-child th {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1rem 0.75rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.marksheet-table thead tr:first-child th:last-child {
+  border-right: none;
+}
+
+.subject-header {
+  text-align: left !important;
+  min-width: 180px;
+  position: sticky;
+  left: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  z-index: 2;
+}
+
+.exam-header {
+  min-width: 100px;
+}
+
+.total-header {
+  min-width: 100px;
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+.percentage-header {
+  min-width: 80px;
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Subheader Row */
+.subheader-row th {
+  background: #f3f4f6 !important;
+  color: #4b5563;
+  padding: 0.5rem 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  border-right: 1px solid #e5e7eb;
+}
+
+.subheader-row th:first-child {
+  position: sticky;
+  left: 0;
+  background: #f3f4f6 !important;
+  z-index: 2;
+  border-right: 2px solid #d1d5db;
+}
+
+.marks-subheader {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+/* Table Body */
+.marksheet-table tbody tr {
+  border-bottom: 1px solid #e5e7eb;
+  transition: background-color 0.2s;
+}
+
+.marksheet-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.subject-row td {
+  padding: 0.75rem;
+  text-align: center;
+  border-right: 1px solid #e5e7eb;
+}
+
+.subject-name {
+  text-align: left !important;
+  font-weight: 600;
+  color: #1f2937;
+  position: sticky;
+  left: 0;
+  background: white;
+  z-index: 1;
+  border-right: 2px solid #d1d5db !important;
+}
+
+.marksheet-table tbody tr:hover .subject-name {
+  background-color: #f9fafb;
+}
+
+.marks-cell {
+  color: #374151;
+  font-weight: 500;
+}
+
+.max-marks {
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.total-obtained {
+  background-color: #f0fdf4;
+  font-weight: 700;
+  color: #15803d;
+}
+
+.total-max {
+  background-color: #f0fdf4;
+  color: #16a34a;
+  font-size: 0.85rem;
+}
+
+.percentage-cell {
+  background-color: #eff6ff;
+  font-weight: 700;
+  color: #1d4ed8;
+  font-size: 0.95rem;
+}
+
+/* Table Footer */
+.marksheet-table tfoot {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  font-weight: 700;
+}
+
+.total-row td {
+  padding: 1rem 0.75rem;
+  border-right: 1px solid #d1d5db;
+  text-align: center;
+}
+
+.total-label {
+  text-align: left !important;
+  font-size: 1rem;
+  color: #1f2937;
+  position: sticky;
+  left: 0;
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  z-index: 2;
+  border-right: 2px solid #d1d5db !important;
+}
+
+.total-marks {
+  color: #374151;
+  font-size: 0.95rem;
+}
+
+.grand-total {
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.grand-percentage {
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .marksheet-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .download-btn {
+    width: 100%;
+  }
+
+  .marksheet-table {
+    font-size: 0.8rem;
+  }
+
+  .marksheet-table thead tr:first-child th {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .subject-row td {
+    padding: 0.5rem;
+  }
+
+  .subject-name {
+    min-width: 120px;
+    font-size: 0.85rem;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .download-btn {
+    display: none;
+  }
+
+  .marksheet-container {
+    box-shadow: none;
+  }
+
+  .marksheet-table {
+    border: 1px solid #000;
+  }
+
+  .marksheet-table thead tr:first-child th {
+    background: #333 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .subject-name,
+  .total-label {
+    background: white !important;
+  }
+}

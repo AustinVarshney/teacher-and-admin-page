@@ -27,14 +27,14 @@ const LandingPage: React.FC = () => {
       path: '/admin/login',
       color: '#ed8936'
     },
-    {
-      title: 'Register School',
-      icon: '🏫',
-      description: 'Developer access to register new schools',
-      path: '/developer/login',
-      color: '#e53e3e',
-      isDeveloper: true
-    }
+    // {
+    //   title: 'Register School',
+    //   icon: '🏫',
+    //   description: 'Developer access to register new schools',
+    //   path: '/developer/login',
+    //   color: '#e53e3e',
+    //   isDeveloper: true
+    // }
   ];
 
   return (
@@ -53,18 +53,18 @@ const LandingPage: React.FC = () => {
           {loginOptions.map((option, index) => (
             <div
               key={index}
-              className={`login-option-card ${option.isDeveloper ? 'developer-card' : ''}`}
+              className={`login-option-card`}
               onClick={() => navigate(option.path)}
               style={{ '--card-color': option.color } as React.CSSProperties}
             >
               <div className="card-icon">{option.icon}</div>
               <h3>{option.title}</h3>
               <p>{option.description}</p>
-              {option.isDeveloper && (
+              {/* {option.isDeveloper && (
                 <div className="developer-tag">
                   <i className="fas fa-lock"></i> Restricted Access
                 </div>
-              )}
+              )} */}
               <div className="card-arrow">
                 <i className="fas fa-arrow-right"></i>
               </div>

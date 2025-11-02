@@ -118,21 +118,7 @@ const SessionManagement: React.FC<SessionManagementProps> = ({ onSessionChange }
     setSuccessMessage('');
 
     try {
-      // Check for overlapping sessions
-      const overlap = await SessionService.checkSessionOverlap(
-        formData.startDate,
-        formData.endDate,
-        editingSession?.id
-      );
-
-      if (overlap.overlaps) {
-        const conflictNames = overlap.conflictingSessions?.map(s => s.name).join(', ');
-        setFormErrors({
-          general: `Date range overlaps with existing session(s): ${conflictNames}. Please choose different dates.`
-        });
-        setIsSubmitting(false);
-        return;
-      }
+      // Removed: Check for overlapping sessions (sessions can overlap now)
 
       if (editingSession) {
         // Update existing session
@@ -192,28 +178,6 @@ const SessionManagement: React.FC<SessionManagementProps> = ({ onSessionChange }
       }
     } catch (err: any) {
       setError(err.message || 'Failed to delete session');
-    }
-  };
-
-  const handleSetActive = async (session: SessionResponse) => {
-    if (session.active) {
-      return; // Already active
-    }
-
-    if (!confirm(`Set "${session.name}" as the active session? All new students will be enrolled in this session.`)) {
-      return;
-    }
-
-    try {
-      await SessionService.setActiveSession(session.id);
-      setSuccessMessage(`Session "${session.name}" is now active.`);
-      await fetchSessions();
-      
-      if (onSessionChange) {
-        onSessionChange();
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to set active session');
     }
   };
 
@@ -436,15 +400,6 @@ const SessionManagement: React.FC<SessionManagementProps> = ({ onSessionChange }
                   </div>
 
                   <div className="session-card-footer">
-                    {!session.active && (
-                      <button 
-                        className="btn-action btn-set-active"
-                        onClick={() => handleSetActive(session)}
-                        title="Set as active session"
-                      >
-                        Set Active
-                      </button>
-                    )}
                     <button 
                       className="btn-action btn-edit"
                       onClick={() => handleEdit(session)}

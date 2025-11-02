@@ -204,6 +204,67 @@ export class StudentService {
       throw new Error(message);
     }
   }
+
+  // Assign roll numbers alphabetically for a class
+  static async assignRollNumbersAlphabetically(classId: number) {
+    try {
+      const response = await api.put(`/students/class/${classId}/assign-roll-numbers-alphabetically`);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data;
+      }
+      throw new Error(response.data.message || 'Failed to assign roll numbers');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to assign roll numbers';
+      throw new Error(message);
+    }
+  }
+
+  // Reassign roll numbers for a class (sequential)
+  static async reassignRollNumbers(classId: number) {
+    try {
+      const response = await api.put(`/students/class/${classId}/reassign-roll-numbers`);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data;
+      }
+      throw new Error(response.data.message || 'Failed to reassign roll numbers');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to reassign roll numbers';
+      throw new Error(message);
+    }
+  }
+
+  // Promote students to a new class
+  static async promoteStudentsToClass(panNumbers: string[], classId: number) {
+    try {
+      const response = await api.put(`/students/promote-to/${classId}`, panNumbers);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data;
+      }
+      throw new Error(response.data.message || 'Failed to promote students');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to promote students';
+      throw new Error(message);
+    }
+  }
+
+
+  // Swap roll numbers of two students
+  static async swapRollNumbers(panNumber1: string, panNumber2: string) {
+    try {
+      const response = await api.put(`/students/swap-roll-numbers?panNumber1=${panNumber1}&panNumber2=${panNumber2}`);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data;
+      }
+      throw new Error(response.data.message || 'Failed to swap roll numbers');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to swap roll numbers';
+      throw new Error(message);
+    }
+  }
 }
 
 export default StudentService;

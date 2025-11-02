@@ -71,6 +71,8 @@ export interface ClassInfoResponse {
   studentCount: number;
   sessionId: number;
   sessionName: string;
+  classTeacherId?: number;
+  classTeacherName?: string;
 }
 
 export class AdminService {
@@ -239,8 +241,8 @@ export class AdminService {
   // Deactivate teacher
   static async deactivateTeacher(id: number): Promise<void> {
     try {
-      // Backend PUT /teachers/{id} deactivates the teacher
-      const response = await api.put(`/teachers/${id}`);
+      // Backend PUT /teachers/deactivate/{id} deactivates the teacher
+      const response = await api.put(`/teachers/deactivate/${id}`);
       
       if (response.status < 200 || response.status >= 300) {
         throw new Error(response.data.message || 'Failed to deactivate teacher');

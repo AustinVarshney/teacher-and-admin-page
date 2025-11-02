@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './AdminDashboard.css';
 import StudentDetailView from './StudentDetailView';
+import TeacherDetailView from './TeacherDetailView';
+import SchoolProfileModal from './SchoolProfileModal';
 import UnifiedRegistration from './UnifiedRegistration';
 import SessionManagement from './SessionManagement';
 import ClassManagement from './ClassManagement';
@@ -12,11 +14,12 @@ import HolidayManagement from './HolidayManagement';
 import MarksUpload from './MarksUpload';
 import ExamManagement from './ExamManagement';
 import GalleryManagement from './GalleryManagement';
+import MessagesManagement from './MessagesManagement';
+import PromotionManagement from './PromotionManagement';
 import { FeeService } from '../../services/feeService';
 import AdminService, { StudentResponse, TeacherResponse, NonTeachingStaffResponse, ClassInfoResponse } from '../../services/adminService';
 import StudentService from '../../services/studentService';
 import TransferCertificateService from '../../services/transferCertificateService';
-import NotificationService, { BroadcastMessageDto } from '../../services/notificationService';
 import LeaveService, { StaffLeaveResponse } from '../../services/leaveService';
 import QueryService, { TeacherQueryResponse } from '../../services/queryService';
 import { SessionService } from '../../services/sessionService';
@@ -40,6 +43,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [feeManagementKey, setFeeManagementKey] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showStudentDetail, setShowStudentDetail] = useState(false);
+  const [selectedTeacher, setSelectedTeacher] = useState<TeacherResponse | null>(null);
+  const [showTeacherDetail, setShowTeacherDetail] = useState(false);
+  const [showSchoolProfile, setShowSchoolProfile] = useState(false);
   
   // State for real data from database
   const [students, setStudents] = useState<StudentResponse[]>([]);
@@ -61,27 +67,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
   // Transfer Certificate state (moved to top level to fix hooks order)
   const [tcRequests, setTcRequests] = useState<any[]>([]);
+  const [processedTcRequests, setProcessedTcRequests] = useState<any[]>([]);
   const [tcLoading, setTcLoading] = useState(false);
+  const [tcDataLoaded, setTcDataLoaded] = useState(false); // Track if TC data has been loaded at least once
+  const [tcView, setTcView] = useState<'pending' | 'processed'>('pending');
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [modalAction, setModalAction] = useState<'APPROVED' | 'REJECTED' | null>(null);
   const [adminReply, setAdminReply] = useState('');
   const [processing, setProcessing] = useState(false);
-
-  // Broadcast/Inbox state
-  const [broadcastTitle, setBroadcastTitle] = useState('');
-  const [broadcastMessage, setBroadcastMessage] = useState('');
-  const [broadcastPriority, setBroadcastPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('MEDIUM');
-  const [selectedRecipientType, setSelectedRecipientType] = useState<'STUDENT' | 'TEACHER' | 'BOTH'>('STUDENT');
-  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
-  const [selectedTeachers, setSelectedTeachers] = useState<string[]>([]);
-  const [selectAllStudents, setSelectAllStudents] = useState(false);
-  const [selectAllTeachers, setSelectAllTeachers] = useState(false);
-  const [broadcasting, setBroadcasting] = useState(false);
-  const [broadcastSuccess, setBroadcastSuccess] = useState('');
-  const [broadcastError, setBroadcastError] = useState('');
-  const [studentSearchTerm, setStudentSearchTerm] = useState('');
-  const [teacherSearchTerm, setTeacherSearchTerm] = useState('');
 
   // Teacher Query and Leave Management state
   const [teacherQueries, setTeacherQueries] = useState<TeacherQueryResponse[]>([]);
@@ -137,9 +131,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   // Load TC requests when switching to TC tab (no auto-refresh)
   useEffect(() => {
     if (activeTab === 'transfer-certificates') {
-      loadTCRequests(false); // Load with alerts on errors
+      if (tcView === 'pending') {
+        loadTCRequests(false); // Load with alerts on errors
+      } else {
+        loadProcessedTCRequests(false);
+      }
     }
-  }, [activeTab]);
+  }, [activeTab, tcView]);
 
   // Load teacher queries and staff leaves
   useEffect(() => {
@@ -202,11 +200,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       setTcLoading(true);
       const requests = await TransferCertificateService.getAllRequests('PENDING');
       setTcRequests(requests || []);
+      setTcDataLoaded(true); // Mark as loaded
     } catch (error: any) {
       console.error('Error loading TC requests:', error);
       // Only show alert if not a silent refresh (i.e., not from polling)
       if (!silent) {
         alert(error.message || 'Failed to load TC requests');
+      }
+    } finally {
+      setTcLoading(false);
+    }
+  };
+  
+  const loadProcessedTCRequests = async (silent = false) => {
+    try {
+      setTcLoading(true);
+      const requests = await TransferCertificateService.getProcessedRequestsFromLastMonth();
+      setProcessedTcRequests(requests || []);
+      setTcDataLoaded(true); // Mark as loaded
+    } catch (error: any) {
+      console.error('Error loading processed TC requests:', error);
+      if (!silent) {
+        alert(error.message || 'Failed to load processed TC requests');
       }
     } finally {
       setTcLoading(false);
@@ -291,6 +306,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     setSelectedStudent(null);
     // Refresh fee management data after closing student detail (in case class was updated)
     setFeeManagementKey(prev => prev + 1);
+  };
+
+  const handleViewTeacher = (teacher: TeacherResponse) => {
+    setSelectedTeacher(teacher);
+    setShowTeacherDetail(true);
+  };
+
+  const handleCloseTeacherDetail = () => {
+    setShowTeacherDetail(false);
+    setSelectedTeacher(null);
   };
 
   const getFeeCatalog = async (studentPanNumber: string): Promise<FeeCatalog> => {
@@ -395,6 +420,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       console.error('Failed to update student status:', err);
       // Show error alert only if something goes wrong
       alert(`Failed to update student status: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle swapping roll numbers (move up/down)
+  const handleSwapRollNumbers = async (currentStudent: Student, direction: 'up' | 'down', classStudents: Student[]) => {
+    try {
+      // Sort students by roll number to find adjacent student
+      const sortedStudents = [...classStudents].sort((a, b) => (a.classRollNumber || 0) - (b.classRollNumber || 0));
+      const currentIndex = sortedStudents.findIndex(s => s.id === currentStudent.id);
+      
+      if (currentIndex === -1) {
+        alert('Student not found in class');
+        return;
+      }
+      
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      
+      if (targetIndex < 0 || targetIndex >= sortedStudents.length) {
+        alert(`Cannot move ${direction}. Student is already at the ${direction === 'up' ? 'top' : 'bottom'}.`);
+        return;
+      }
+      
+      const targetStudent = sortedStudents[targetIndex];
+      
+      setLoading(true);
+      await StudentService.swapRollNumbers(currentStudent.id, targetStudent.id);
+      
+      // Refresh data
+      await fetchAllData();
+      alert('Roll numbers swapped successfully!');
+    } catch (err: any) {
+      console.error('Failed to swap roll numbers:', err);
+      alert(`Failed to swap roll numbers: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -604,9 +664,52 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               const sectionLetter = parts[1] || cls.section;
               const formattedClassName = `Class ${classNumber} - Section ${sectionLetter}`;
               
+              // Find the classId for this class
+              const classEntity = classes.find(c => c.className === cls.className);
+              const classId = classEntity?.id;
+              
               return (
                 <div key={cls.className} className="class-tab">
-                  <h4>{formattedClassName}</h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div>
+                      <h4 style={{ margin: 0 }}>{formattedClassName}</h4>
+                      {classEntity?.classTeacherName && (
+                        <p style={{ 
+                          margin: '0.5rem 0 0 0', 
+                          fontSize: '0.9rem', 
+                          color: '#6366f1',
+                          fontWeight: '500'
+                        }}>
+                          👨‍🏫 Class Teacher: {classEntity.classTeacherName}
+                        </p>
+                      )}
+                    </div>
+                    {classId && (
+                      <button
+                        className="action-btn"
+                        onClick={async () => {
+                          if (confirm(`Assign roll numbers alphabetically for ${formattedClassName}?`)) {
+                            try {
+                              await StudentService.assignRollNumbersAlphabetically(classId);
+                              alert('Roll numbers assigned successfully!');
+                              await fetchAllData();
+                            } catch (err: any) {
+                              alert(`Failed to assign roll numbers: ${err.message}`);
+                            }
+                          }
+                        }}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          fontSize: '0.875rem',
+                          background: '#6366f1',
+                          color: 'white'
+                        }}
+                        title="Assign roll numbers alphabetically by student name"
+                      >
+                        🔢 Assign Roll Numbers A-Z
+                      </button>
+                    )}
+                  </div>
                   <div className="class-stats">
                   <span>Total: {cls.totalStudents}</span>
                   <span>Fee Collection: {cls.feeCollectionRate}%</span>
@@ -627,9 +730,52 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                         </tr>
                       </thead>
                       <tbody>
-                        {cls.students.map((student) => (
+                        {/* Sort students by roll number before displaying */}
+                        {[...cls.students]
+                          .sort((a, b) => (a.classRollNumber || 0) - (b.classRollNumber || 0))
+                          .map((student, index, sortedStudents) => (
                           <tr key={student.id}>
-                            <td>{student.name}</td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                  <button
+                                    onClick={() => handleSwapRollNumbers(student, 'up', cls.students)}
+                                    disabled={index === 0}
+                                    style={{
+                                      padding: '0.25rem 0.5rem',
+                                      fontSize: '0.75rem',
+                                      cursor: index === 0 ? 'not-allowed' : 'pointer',
+                                      opacity: index === 0 ? 0.5 : 1,
+                                      background: '#3b82f6',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px'
+                                    }}
+                                    title="Move up"
+                                  >
+                                    ▲
+                                  </button>
+                                  <button
+                                    onClick={() => handleSwapRollNumbers(student, 'down', cls.students)}
+                                    disabled={index === sortedStudents.length - 1}
+                                    style={{
+                                      padding: '0.25rem 0.5rem',
+                                      fontSize: '0.75rem',
+                                      cursor: index === sortedStudents.length - 1 ? 'not-allowed' : 'pointer',
+                                      opacity: index === sortedStudents.length - 1 ? 0.5 : 1,
+                                      background: '#3b82f6',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px'
+                                    }}
+                                    title="Move down"
+                                  >
+                                    ▼
+                                  </button>
+                                </div>
+                                <span>{student.name}</span>
+                              </div>
+                            </td>
                             <td>{student.classRollNumber}</td>
                             <td>{student.section}</td>
                             <td>
@@ -805,7 +951,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                       </div>
                     </div>
                     <div className="staff-actions">
-                      <button className="action-btn">View Details</button>
+                      <button 
+                        className="action-btn"
+                        onClick={() => handleViewTeacher(teacher)}
+                      >
+                        View Details
+                      </button>
                       {teacher.status === 'ACTIVE' ? (
                         <button 
                           className="action-btn deactivate-btn"
@@ -925,23 +1076,57 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   };
 
   const renderTransferCertificates = () => {
+    const requestsToShow = tcView === 'pending' ? tcRequests : processedTcRequests;
+    
     return (
       <div className="transfer-certificates-section">
         <div style={{ marginBottom: '20px' }}>
           <h3>Transfer Certificate Requests</h3>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+            <button
+              onClick={() => setTcView('pending')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: tcView === 'pending' ? '#3b82f6' : '#f1f5f9',
+                color: tcView === 'pending' ? 'white' : '#475569',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: 600,
+                transition: 'all 0.2s'
+              }}
+            >
+              📋 Pending Requests {!tcDataLoaded || tcLoading ? '(...)' : `(${tcRequests.length})`}
+            </button>
+            <button
+              onClick={() => setTcView('processed')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: tcView === 'processed' ? '#3b82f6' : '#f1f5f9',
+                color: tcView === 'processed' ? 'white' : '#475569',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: 600,
+                transition: 'all 0.2s'
+              }}
+            >
+              ✓ Last Month {!tcDataLoaded || tcLoading ? '(...)' : `(${processedTcRequests.length})`}
+            </button>
+          </div>
         </div>
 
         {tcLoading ? (
           <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
             Loading TC requests...
           </div>
-        ) : tcRequests.length === 0 ? (
+        ) : requestsToShow.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-            <p>No pending TC requests at the moment.</p>
+            <p>{tcView === 'pending' ? 'No pending TC requests at the moment.' : 'No processed TC requests from the last month.'}</p>
           </div>
         ) : (
           <div className="tc-requests">
-            {tcRequests.map((tc) => (
+            {requestsToShow.map((tc) => (
               <div key={tc.id} className="tc-request-card">
                 <div className="tc-header">
                   <h4>{tc.studentName || 'N/A'}</h4>
@@ -954,24 +1139,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                   <p><strong>Class:</strong> {tc.className || 'N/A'}</p>
                   <p><strong>Session:</strong> {tc.sessionName || 'N/A'}</p>
                   <p><strong>Request Date:</strong> {tc.requestDate ? new Date(tc.requestDate).toLocaleDateString() : 'N/A'}</p>
+                  {tcView === 'processed' && tc.adminActionDate && (
+                    <p><strong>Action Date:</strong> {new Date(tc.adminActionDate).toLocaleDateString()}</p>
+                  )}
+                  {tcView === 'processed' && tc.adminReply && (
+                    <p><strong>Admin Reply:</strong> {tc.adminReply}</p>
+                  )}
                   <p><strong>Reason:</strong> {tc.reason || 'N/A'}</p>
                 </div>
-                <div className="tc-actions">
-                  <button 
-                    className="action-btn approve"
-                    onClick={() => handleOpenModal(tc, 'APPROVED')}
-                    disabled={processing}
-                  >
-                    ✓ Approve
-                  </button>
-                  <button 
-                    className="action-btn reject"
-                    onClick={() => handleOpenModal(tc, 'REJECTED')}
-                    disabled={processing}
-                  >
-                    ✗ Reject
-                  </button>
-                </div>
+                {tcView === 'pending' && (
+                  <div className="tc-actions">
+                    <button 
+                      className="action-btn approve"
+                      onClick={() => handleOpenModal(tc, 'APPROVED')}
+                      disabled={processing}
+                    >
+                      ✓ Approve
+                    </button>
+                    <button 
+                      className="action-btn reject"
+                      onClick={() => handleOpenModal(tc, 'REJECTED')}
+                      disabled={processing}
+                    >
+                      ✗ Reject
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1072,535 +1265,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     );
   };
 
-  const renderInbox = () => {
-    // Filter students based on search term
-    const filteredStudents = students.filter(student => {
-      const searchLower = studentSearchTerm.toLowerCase();
-      return (
-        student.name.toLowerCase().includes(searchLower) ||
-        student.panNumber.toLowerCase().includes(searchLower) ||
-        student.className?.toLowerCase().includes(searchLower)
-      );
-    });
-
-    // Filter teachers based on search term
-    const filteredTeachers = teachers.filter(teacher => {
-      const searchLower = teacherSearchTerm.toLowerCase();
-      return (
-        teacher.name.toLowerCase().includes(searchLower) ||
-        teacher.email.toLowerCase().includes(searchLower) ||
-        teacher.designation?.toLowerCase().includes(searchLower)
-      );
-    });
-
-    // Handle select all students
-    const handleSelectAllStudents = (checked: boolean) => {
-      setSelectAllStudents(checked);
-      if (checked) {
-        setSelectedStudents(filteredStudents.map(s => s.panNumber));
-      } else {
-        setSelectedStudents([]);
-      }
-    };
-
-    // Handle select all teachers
-    const handleSelectAllTeachers = (checked: boolean) => {
-      setSelectAllTeachers(checked);
-      if (checked) {
-        setSelectedTeachers(filteredTeachers.map(t => t.email));
-      } else {
-        setSelectedTeachers([]);
-      }
-    };
-
-    // Handle individual student selection
-    const handleStudentToggle = (panNumber: string) => {
-      setSelectedStudents(prev => {
-        if (prev.includes(panNumber)) {
-          return prev.filter(p => p !== panNumber);
-        } else {
-          return [...prev, panNumber];
-        }
-      });
-    };
-
-    // Handle individual teacher selection
-    const handleTeacherToggle = (email: string) => {
-      setSelectedTeachers(prev => {
-        if (prev.includes(email)) {
-          return prev.filter(e => e !== email);
-        } else {
-          return [...prev, email];
-        }
-      });
-    };
-
-    // Handle broadcast message
-    const handleBroadcast = async () => {
-      try {
-        setBroadcasting(true);
-        setBroadcastError('');
-        setBroadcastSuccess('');
-
-        // Validation
-        if (!broadcastTitle.trim()) {
-          setBroadcastError('Please enter a message title');
-          return;
-        }
-
-        if (!broadcastMessage.trim()) {
-          setBroadcastError('Please enter a message');
-          return;
-        }
-
-        // Collect recipients based on selection
-        let recipientIds: string[] = [];
-        
-        if (selectedRecipientType === 'STUDENT' || selectedRecipientType === 'BOTH') {
-          if (selectedStudents.length === 0) {
-            setBroadcastError('Please select at least one student');
-            return;
-          }
-          recipientIds = [...recipientIds, ...selectedStudents];
-        }
-
-        if (selectedRecipientType === 'TEACHER' || selectedRecipientType === 'BOTH') {
-          if (selectedTeachers.length === 0 && selectedRecipientType === 'TEACHER') {
-            setBroadcastError('Please select at least one teacher');
-            return;
-          }
-          recipientIds = [...recipientIds, ...selectedTeachers];
-        }
-
-        if (recipientIds.length === 0) {
-          setBroadcastError('Please select at least one recipient');
-          return;
-        }
-
-        // Send broadcast for students
-        if (selectedRecipientType === 'STUDENT' || selectedRecipientType === 'BOTH') {
-          const studentBroadcast: BroadcastMessageDto = {
-            title: broadcastTitle,
-            message: broadcastMessage,
-            recipientIds: selectedStudents,
-            recipientType: 'STUDENT',
-            priority: broadcastPriority
-          };
-          await NotificationService.broadcastMessage(studentBroadcast);
-        }
-
-        // Send broadcast for teachers
-        if (selectedRecipientType === 'TEACHER' || selectedRecipientType === 'BOTH') {
-          const teacherBroadcast: BroadcastMessageDto = {
-            title: broadcastTitle,
-            message: broadcastMessage,
-            recipientIds: selectedTeachers,
-            recipientType: 'TEACHER',
-            priority: broadcastPriority
-          };
-          await NotificationService.broadcastMessage(teacherBroadcast);
-        }
-
-        setBroadcastSuccess(`Message sent successfully to ${recipientIds.length} recipient(s)!`);
-        
-        // Reset form
-        setBroadcastTitle('');
-        setBroadcastMessage('');
-        setSelectedStudents([]);
-        setSelectedTeachers([]);
-        setSelectAllStudents(false);
-        setSelectAllTeachers(false);
-        
-        // Clear success message after 5 seconds
-        setTimeout(() => setBroadcastSuccess(''), 5000);
-
-      } catch (err: any) {
-        console.error('Broadcast error:', err);
-        setBroadcastError(err.message || 'Failed to send broadcast message');
-      } finally {
-        setBroadcasting(false);
-      }
-    };
-
-    return (
-      <div className="inbox-section">
-        <h3 style={{ marginBottom: '1.5rem', fontSize: '1.75rem' }}>📧 Broadcast Message</h3>
-        
-        {/* Success/Error Messages */}
-        {broadcastSuccess && (
-          <div style={{
-            padding: '1rem',
-            marginBottom: '1rem',
-            backgroundColor: '#10b981',
-            color: 'white',
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <span>✓</span>
-            <span>{broadcastSuccess}</span>
-          </div>
-        )}
-
-        {broadcastError && (
-          <div style={{
-            padding: '1rem',
-            marginBottom: '1rem',
-            backgroundColor: '#ef4444',
-            color: 'white',
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <span>⚠️</span>
-            <span>{broadcastError}</span>
-          </div>
-        )}
-
-        <div style={{ display: 'grid', gap: '1.5rem' }}>
-          {/* Message Compose Section */}
-          <div style={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            border: '1px solid #e5e7eb',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-          }}>
-            <h4 style={{ marginBottom: '1rem', fontSize: '1.1rem', color: '#1f2937' }}>Compose Message</h4>
-            
-            <div style={{ display: 'grid', gap: '1rem' }}>
-              {/* Title Input */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', fontSize: '0.9rem' }}>
-                  Message Title *
-                </label>
-                <input
-                  type="text"
-                  value={broadcastTitle}
-                  onChange={(e) => setBroadcastTitle(e.target.value)}
-                  placeholder="Enter message title..."
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    fontSize: '1rem'
-                  }}
-                />
-              </div>
-
-              {/* Priority Selection */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', fontSize: '0.9rem' }}>
-                  Priority Level
-                </label>
-                <select
-                  value={broadcastPriority}
-                  onChange={(e) => setBroadcastPriority(e.target.value as 'LOW' | 'MEDIUM' | 'HIGH')}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    fontSize: '1rem'
-                  }}
-                >
-                  <option value="LOW">🟢 Low Priority</option>
-                  <option value="MEDIUM">🟡 Medium Priority</option>
-                  <option value="HIGH">🔴 High Priority</option>
-                </select>
-              </div>
-
-              {/* Message Textarea */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', fontSize: '0.9rem' }}>
-                  Message Content *
-                </label>
-                <textarea
-                  value={broadcastMessage}
-                  onChange={(e) => setBroadcastMessage(e.target.value)}
-                  placeholder="Type your message here..."
-                  rows={6}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    fontSize: '1rem',
-                    resize: 'vertical',
-                    fontFamily: 'inherit'
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Recipient Selection Section */}
-          <div style={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            border: '1px solid #e5e7eb',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-          }}>
-            <h4 style={{ marginBottom: '1rem', fontSize: '1.1rem', color: '#1f2937' }}>Select Recipients</h4>
-            
-            {/* Recipient Type Tabs */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
-              <button
-                onClick={() => setSelectedRecipientType('STUDENT')}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  background: selectedRecipientType === 'STUDENT' ? '#3b82f6' : '#f3f4f6',
-                  color: selectedRecipientType === 'STUDENT' ? 'white' : '#4b5563',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                👨‍🎓 Students Only
-              </button>
-              <button
-                onClick={() => setSelectedRecipientType('TEACHER')}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  background: selectedRecipientType === 'TEACHER' ? '#3b82f6' : '#f3f4f6',
-                  color: selectedRecipientType === 'TEACHER' ? 'white' : '#4b5563',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                👨‍🏫 Teachers Only
-              </button>
-              <button
-                onClick={() => setSelectedRecipientType('BOTH')}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  background: selectedRecipientType === 'BOTH' ? '#3b82f6' : '#f3f4f6',
-                  color: selectedRecipientType === 'BOTH' ? 'white' : '#4b5563',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                👥 Both
-              </button>
-            </div>
-
-            {/* Students List */}
-            {(selectedRecipientType === 'STUDENT' || selectedRecipientType === 'BOTH') && (
-              <div style={{ marginBottom: selectedRecipientType === 'BOTH' ? '1.5rem' : '0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h5 style={{ margin: 0, fontSize: '1rem', color: '#374151' }}>
-                    Students ({selectedStudents.length} selected{studentSearchTerm ? ` • ${filteredStudents.length} found` : ''})
-                  </h5>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={selectAllStudents}
-                      onChange={(e) => handleSelectAllStudents(e.target.checked)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Select All</span>
-                  </label>
-                </div>
-                
-                {/* Student Search Input */}
-                <div style={{ marginBottom: '1rem' }}>
-                  <input
-                    type="text"
-                    placeholder="🔍 Search by name, PAN, or class..."
-                    value={studentSearchTerm}
-                    onChange={(e) => setStudentSearchTerm(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      fontSize: '0.95rem',
-                      outline: 'none',
-                      transition: 'border-color 0.2s'
-                    }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
-                  />
-                </div>
-                
-                <div style={{
-                  maxHeight: '300px',
-                  overflowY: 'auto',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  padding: '0.5rem'
-                }}>
-                  {filteredStudents.length === 0 ? (
-                    <p style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>
-                      {studentSearchTerm ? 'No students found matching your search' : 'No students available'}
-                    </p>
-                  ) : (
-                    filteredStudents.map(student => (
-                      <label
-                        key={student.panNumber}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.75rem',
-                          padding: '0.75rem',
-                          cursor: 'pointer',
-                          borderRadius: '6px',
-                          transition: 'background 0.2s',
-                          background: selectedStudents.includes(student.panNumber) ? '#eff6ff' : 'transparent'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = selectedStudents.includes(student.panNumber) ? '#eff6ff' : 'transparent'}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedStudents.includes(student.panNumber)}
-                          onChange={() => handleStudentToggle(student.panNumber)}
-                          style={{ cursor: 'pointer' }}
-                        />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: '500', fontSize: '0.95rem' }}>{student.name}</div>
-                          <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                            {student.className} • {student.panNumber}
-                          </div>
-                        </div>
-                      </label>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Teachers List */}
-            {(selectedRecipientType === 'TEACHER' || selectedRecipientType === 'BOTH') && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h5 style={{ margin: 0, fontSize: '1rem', color: '#374151' }}>
-                    Teachers ({selectedTeachers.length} selected{teacherSearchTerm ? ` • ${filteredTeachers.length} found` : ''})
-                  </h5>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={selectAllTeachers}
-                      onChange={(e) => handleSelectAllTeachers(e.target.checked)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Select All</span>
-                  </label>
-                </div>
-                
-                {/* Teacher Search Input */}
-                <div style={{ marginBottom: '1rem' }}>
-                  <input
-                    type="text"
-                    placeholder="🔍 Search by name, email, or designation..."
-                    value={teacherSearchTerm}
-                    onChange={(e) => setTeacherSearchTerm(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      fontSize: '0.95rem',
-                      outline: 'none',
-                      transition: 'border-color 0.2s'
-                    }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
-                    onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
-                  />
-                </div>
-                
-                <div style={{
-                  maxHeight: '300px',
-                  overflowY: 'auto',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  padding: '0.5rem'
-                }}>
-                  {filteredTeachers.length === 0 ? (
-                    <p style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>
-                      {teacherSearchTerm ? 'No teachers found matching your search' : 'No teachers available'}
-                    </p>
-                  ) : (
-                    filteredTeachers.map(teacher => (
-                      <label
-                        key={teacher.email}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.75rem',
-                          padding: '0.75rem',
-                          cursor: 'pointer',
-                          borderRadius: '6px',
-                          transition: 'background 0.2s',
-                          background: selectedTeachers.includes(teacher.email) ? '#eff6ff' : 'transparent'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = selectedTeachers.includes(teacher.email) ? '#eff6ff' : 'transparent'}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedTeachers.includes(teacher.email)}
-                          onChange={() => handleTeacherToggle(teacher.email)}
-                          style={{ cursor: 'pointer' }}
-                        />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: '500', fontSize: '0.95rem' }}>{teacher.name}</div>
-                          <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                            {teacher.designation} • {teacher.email}
-                          </div>
-                        </div>
-                      </label>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Send Button */}
-          <button
-            onClick={handleBroadcast}
-            disabled={broadcasting}
-            style={{
-              padding: '1rem',
-              background: broadcasting ? '#9ca3af' : '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '1.1rem',
-              fontWeight: '600',
-              cursor: broadcasting ? 'not-allowed' : 'pointer',
-              transition: 'background 0.2s',
-              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-            }}
-            onMouseEnter={(e) => !broadcasting && (e.currentTarget.style.background = '#2563eb')}
-            onMouseLeave={(e) => !broadcasting && (e.currentTarget.style.background = '#3b82f6')}
-          >
-            {broadcasting ? '📤 Sending...' : '📤 Send Broadcast Message'}
-          </button>
-        </div>
-      </div>
-    );
-  };
+  // Note: renderInbox has been replaced by MessagesManagement component
+  // The old inbox functionality is no longer used
 
   // Load teacher queries from admin
   const loadTeacherQueries = async () => {
     try {
+      // Fetch ALL queries (OPEN, RESPONDED, CLOSED) to show complete history like leave requests
       const queries = await QueryService.getTeacherQueriesForAdmin();
       setTeacherQueries(queries);
     } catch (err) {
@@ -1620,11 +1291,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     }
   };
 
-
-
   // Handle responding to teacher query
   const handleRespondToTeacherQuery = async (queryId: number) => {
     try {
+      // Find the query to check its status
+      const query = teacherQueries.find(q => q.id === queryId);
+      console.log('Respond button clicked for query ID:', queryId, 'Query:', query);
+      if (!query) {
+        alert('Query not found');
+        return;
+      }
+
+      console.log('Current status of the query:', query.status);
+      console.log('Query Object:', query);
+      
+      // Check if query is still open
+      if (query.status !== 'OPEN') {
+        alert('This query has already been responded to or is no longer open');
+        await loadTeacherQueries(); // Refresh the list
+        return;
+      }
+
       const response = queryResponseText[queryId];
       if (!response || !response.trim()) {
         alert('Please enter a response');
@@ -1831,11 +1518,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     💬 Provide Your Response:
                   </label>
                   <textarea
-                    value={queryResponseText[query.adminId!] || ''}
+                    value={queryResponseText[query.id] || ''}
                     onChange={(e) => {
-                      if (query.adminId) {
-                        setQueryResponseText({ ...queryResponseText, [query.adminId]: e.target.value });
-                      }
+                      console.log('Query ID:', query.id);
+                      setQueryResponseText({ ...queryResponseText, [query.id]: e.target.value });
                     }}
                     placeholder="Type your detailed response to help the teacher..."
                     rows={5}
@@ -1862,34 +1548,37 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <button 
                       onClick={() => {
-                        if (query.adminId && queryResponseText[query.adminId]?.trim()) {
-                          handleRespondToTeacherQuery(query.adminId);
+                        console.log('Respond button clicked for query ID:', query.id);
+                        console.log('Response Text:', queryResponseText[query.id]);
+                        console.log('Query Object:', query);
+                        if (queryResponseText[query.id]?.trim()) {
+                          handleRespondToTeacherQuery(query.id);
                         }
                       }}
-                      disabled={!query.adminId || !queryResponseText[query.adminId]?.trim()}
+                      disabled={!queryResponseText[query.id]?.trim()}
                       style={{ 
-                        backgroundColor: (!query.adminId || !queryResponseText[query.adminId]?.trim()) ? '#9ca3af' : '#10b981',
+                        backgroundColor: !queryResponseText[query.id]?.trim() ? '#9ca3af' : '#10b981',
                         color: 'white', 
                         padding: '0.875rem 2rem', 
                         borderRadius: '8px',
                         border: 'none',
                         fontSize: '1rem',
                         fontWeight: '700',
-                        cursor: (!query.adminId || !queryResponseText[query.adminId]?.trim()) ? 'not-allowed' : 'pointer',
+                        cursor: !queryResponseText[query.id]?.trim() ? 'not-allowed' : 'pointer',
                         transition: 'all 0.2s',
-                        boxShadow: (!query.adminId || !queryResponseText[query.adminId]?.trim()) ? 'none' : '0 2px 4px rgba(16, 185, 129, 0.4)',
+                        boxShadow: !queryResponseText[query.id]?.trim() ? 'none' : '0 2px 4px rgba(16, 185, 129, 0.4)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.5rem'
                       }}
                       onMouseOver={(e) => {
-                        if (query.adminId && queryResponseText[query.adminId]?.trim()) {
+                        if (queryResponseText[query.id]?.trim()) {
                           e.currentTarget.style.backgroundColor = '#059669';
                           e.currentTarget.style.transform = 'scale(1.02)';
                         }
                       }}
                       onMouseOut={(e) => {
-                        if (query.adminId && queryResponseText[query.adminId]?.trim()) {
+                        if (queryResponseText[query.id]?.trim()) {
                           e.currentTarget.style.backgroundColor = '#10b981';
                           e.currentTarget.style.transform = 'scale(1)';
                         }
@@ -1898,13 +1587,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                       <span>📤</span>
                       <span>Send Response</span>
                     </button>
-                    {queryResponseText[query.adminId!]?.trim() && (
+                    {queryResponseText[query.id]?.trim() && (
                       <span style={{ 
                         fontSize: '0.85rem', 
                         color: '#6b7280',
                         fontWeight: '500'
                       }}>
-                        {queryResponseText[query.adminId!].length} characters
+                        {queryResponseText[query.id].length} characters
                       </span>
                     )}
                   </div>
@@ -2103,14 +1792,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         return <TimetableManagement />;
       case 'exams':
         return <ExamManagement />;
+      case 'promotions':
+        return <PromotionManagement />;
       case 'teacher-queries':
         return renderTeacherQueries();
       case 'staff-leaves':
         return renderStaffLeaves();
       case 'marks-upload':
         return <MarksUpload activeSessionId={activeSessionId} />;
-      case 'inbox':
-        return renderInbox();
+      case 'messages':
+        return <MessagesManagement students={students} teachers={teachers} />;
       case 'gallery':
         return <GalleryManagement />;
       case 'holidays':
@@ -2128,8 +1819,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
           <h2>SLMS Admin</h2>
         </div>
         <div className="nav-actions">
-          <button className="nav-btn">🔔</button>
-          <button className="nav-btn">👤</button>
+          <button className="nav-btn" onClick={() => setShowSchoolProfile(true)} title="School Profile">🏢</button>
           <button className="nav-btn logout" onClick={handleLogout}>Logout</button>
         </div>
       </nav>
@@ -2198,6 +1888,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               📝 Exams
             </button>
             <button
+              className={`nav-item ${activeTab === 'promotions' ? 'active' : ''}`}
+              onClick={() => setActiveTab('promotions')}
+            >
+              🎓 Promotions
+            </button>
+            <button
               className={`nav-item ${activeTab === 'transfer-certificates' ? 'active' : ''}`}
               onClick={() => setActiveTab('transfer-certificates')}
             >
@@ -2228,10 +1924,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               📊 Upload Marks
             </button>
             <button
-              className={`nav-item ${activeTab === 'inbox' ? 'active' : ''}`}
-              onClick={() => setActiveTab('inbox')}
+              className={`nav-item ${activeTab === 'messages' ? 'active' : ''}`}
+              onClick={() => setActiveTab('messages')}
             >
-              📧 Inbox
+              � Messages
             </button>
             <button
               className={`nav-item ${activeTab === 'gallery' ? 'active' : ''}`}
@@ -2278,6 +1974,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             }
           }}
           getFeeCatalog={getFeeCatalog}
+        />
+      )}
+
+      {/* Teacher Detail Modal */}
+      {showTeacherDetail && selectedTeacher && (
+        <TeacherDetailView
+          teacher={selectedTeacher}
+          onClose={handleCloseTeacherDetail}
+          onUpdate={async () => {
+            try {
+              // Refresh teachers list after update
+              await fetchAllData();
+              
+              // Fetch fresh teacher data directly from API
+              if (selectedTeacher) {
+                const freshTeacherData = await AdminService.getTeacherById(selectedTeacher.id);
+                setSelectedTeacher(freshTeacherData);
+              }
+            } catch (error) {
+              console.error('Failed to refresh teacher data:', error);
+            }
+          }}
+        />
+      )}
+
+      {showSchoolProfile && (
+        <SchoolProfileModal
+          schoolId={1} // Assuming school ID is 1, adjust if needed
+          onClose={() => setShowSchoolProfile(false)}
         />
       )}
     </div>

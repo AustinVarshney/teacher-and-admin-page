@@ -89,7 +89,7 @@ export class TeacherService {
   // Update teacher profile
   static async updateTeacher(id: string | number, teacherData: TeacherData) {
     try {
-      const response = await api.put(`/teachers/${id}`, teacherData);
+      const response = await api.put(`/teachers/update/${id}`, teacherData);
       
       if (response.status >= 200 && response.status < 300) {
         return response.data.data;

@@ -14,6 +14,7 @@ import MarkAttendance from './MarkAttendance';
 import NotificationService, { NotificationDto } from '../../services/notificationService';
 import { SessionService } from '../../services/sessionService';
 import HolidayService, { Holiday } from '../../services/holidayService';
+import PromotionAssignment from '../../components/PromotionAssignment';
 
 interface TeacherDashboardProps {
   onLogout: () => void;
@@ -38,6 +39,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
   const [notifications, setNotifications] = useState<NotificationDto[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [classTeacherClassIds, setClassTeacherClassIds] = useState<number[]>([]); // Store class IDs where teacher is class teacher
 
   // New states for queries and leaves
   const [studentQueries, setStudentQueries] = useState<StudentQueryResponse[]>([]);
@@ -415,6 +417,35 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
 
       // Fetch teacher profile
       const teacherData = await TeacherService.getCurrentTeacher();
+      
+      console.log('===== FETCHING CLASS TEACHER ASSIGNMENTS =====');
+      console.log('Teacher ID:', teacherData.id);
+      
+      // Fetch classes where THIS teacher is the class teacher
+      // We need to query the class_entity table where class_teacher_id = teacher.id
+      try {
+        const allClasses = await TeacherService.getAllClasses();
+        console.log('All classes fetched:', allClasses);
+        
+        // Filter classes where this teacher is the class teacher
+        const classTeacherClasses = allClasses.filter((cls: any) => {
+          const isClassTeacher = cls.classTeacherId === teacherData.id;
+          console.log(`Class ${cls.className} (ID: ${cls.id}) - classTeacherId: ${cls.classTeacherId}, teacher.id: ${teacherData.id}, match: ${isClassTeacher}`);
+          return isClassTeacher;
+        });
+        
+        console.log('Classes where teacher is class teacher:', classTeacherClasses);
+        
+        // Extract class IDs
+        const classIds = classTeacherClasses.map((cls: any) => Number(cls.id));
+        console.log('Extracted classTeacherClassIds:', classIds);
+        setClassTeacherClassIds(classIds);
+      } catch (classError) {
+        console.error('Error fetching class teacher assignments:', classError);
+        setClassTeacherClassIds([]);
+      }
+      
+      console.log('==============================================');
       
       // Transform backend data to match frontend Teacher interface
       const transformedTeacher: Teacher = {
@@ -1247,28 +1278,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                 className="action-btn"
                 style={{
                   padding: '0.6rem',
-                  backgroundColor: '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#059669'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
-                onClick={() => {
-                  setSelectedClassForAttendance(cls);
-                  setShowMarkAttendance(true);
-                }}
-              >
-                ✓ Mark Attendance
-              </button>
-              <button 
-                className="action-btn"
-                style={{
-                  padding: '0.6rem',
                   backgroundColor: '#8b5cf6',
                   color: 'white',
                   border: 'none',
@@ -1463,7 +1472,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {myTeacherQueries.map((query) => (
-              <div key={query.id} style={{
+              <div key={query.adminId} style={{
                 backgroundColor: '#ffffff',
                 border: '1px solid #e5e7eb',
                 borderLeft: `4px solid ${query.status === 'RESPONDED' ? '#10b981' : '#f59e0b'}`,
@@ -1574,7 +1583,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {studentQueries.map((query) => (
-              <div key={query.id} style={{
+              <div key={query.teacherId} style={{
                 backgroundColor: '#ffffff',
                 border: '1px solid #e5e7eb',
                 borderLeft: `4px solid ${query.status === 'RESPONDED' ? '#10b981' : '#3b82f6'}`,
@@ -1638,10 +1647,33 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                         📅 {new Date(query.respondedAt).toLocaleString()}
                       </p>
                     )}
+                    {query.status !== 'CLOSED' && (
+                      <button
+                        onClick={() => {
+                          console.log('Editing response for query:', query);
+                          if (query.teacherId) {
+                            setResponseText({ ...responseText, [query.teacherId]: query.response || '' });
+                          }
+                        }}
+                        style={{
+                          marginTop: '0.75rem',
+                          padding: '0.5rem 1rem',
+                          background: '#3b82f6',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: 600
+                        }}
+                      >
+                        ✏️ Edit Response
+                      </button>
+                    )}
                   </div>
                 )}
 
-                {query.status === 'OPEN' && (
+                {((query.status === 'OPEN' && !query.response) || (query.response && responseText[query.teacherId!])) && query.status !== 'CLOSED' && (
                   <div style={{
                     backgroundColor: '#f8fafc',
                     padding: '1.5rem',
@@ -1655,7 +1687,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                       color: '#1f2937',
                       fontSize: '0.95rem'
                     }}>
-                      💬 Your Response:
+                      💬 {query.response && responseText[query.teacherId!] ? 'Edit Your Response:' : 'Your Response:'}
                     </label>
                     <textarea
                       value={responseText[query.teacherId!] || ''}
@@ -1685,38 +1717,61 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                       onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
                       onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                     />
-                    <button 
-                      onClick={() => {
-                        if (query.teacherId && responseText[query.teacherId]?.trim()) {
-                          handleRespondToQuery(query.teacherId);
-                        }
-                      }}
-                      disabled={!query.teacherId || !responseText[query.teacherId]?.trim()}
-                      style={{ 
-                        backgroundColor: (!query.teacherId || !responseText[query.teacherId]?.trim()) ? '#d1d5db' : '#10b981',
-                        color: 'white', 
-                        padding: '0.75rem 1.5rem', 
-                        borderRadius: '8px',
-                        border: 'none',
-                        fontSize: '0.95rem',
-                        fontWeight: '600',
-                        cursor: (!query.teacherId || !responseText[query.teacherId]?.trim()) ? 'not-allowed' : 'pointer',
-                        transition: 'all 0.2s',
-                        boxShadow: (!query.teacherId || !responseText[query.teacherId]?.trim()) ? 'none' : '0 2px 4px rgba(16, 185, 129, 0.3)'
-                      }}
-                      onMouseOver={(e) => {
-                        if (query.teacherId && responseText[query.teacherId]?.trim()) {
-                          e.currentTarget.style.backgroundColor = '#059669';
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (query.teacherId && responseText[query.teacherId]?.trim()) {
-                          e.currentTarget.style.backgroundColor = '#10b981';
-                        }
-                      }}
-                    >
-                      📤 Send Reply
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                      <button 
+                        onClick={() => {
+                          if (query.teacherId && responseText[query.teacherId]?.trim()) {
+                            handleRespondToQuery(query.teacherId);
+                          }
+                        }}
+                        disabled={!query.teacherId || !responseText[query.teacherId]?.trim()}
+                        style={{ 
+                          backgroundColor: (!query.teacherId || !responseText[query.teacherId]?.trim()) ? '#d1d5db' : '#10b981',
+                          color: 'white', 
+                          padding: '0.75rem 1.5rem', 
+                          borderRadius: '8px',
+                          border: 'none',
+                          fontSize: '0.95rem',
+                          fontWeight: '600',
+                          cursor: (!query.teacherId || !responseText[query.teacherId]?.trim()) ? 'not-allowed' : 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: (!query.teacherId || !responseText[query.teacherId]?.trim()) ? 'none' : '0 2px 4px rgba(16, 185, 129, 0.3)'
+                        }}
+                        onMouseOver={(e) => {
+                          if (query.teacherId && responseText[query.teacherId]?.trim()) {
+                            e.currentTarget.style.backgroundColor = '#059669';
+                          }
+                        }}
+                        onMouseOut={(e) => {
+                          if (query.teacherId && responseText[query.teacherId]?.trim()) {
+                            e.currentTarget.style.backgroundColor = '#10b981';
+                          }
+                        }}
+                      >
+                        {query.response && responseText[query.teacherId!] ? '💾 Update Reply' : '📤 Send Reply'}
+                      </button>
+                      {query.response && responseText[query.teacherId!] && (
+                        <button
+                          onClick={() => {
+                            if (query.teacherId) {
+                              setResponseText({ ...responseText, [query.teacherId]: '' });
+                            }
+                          }}
+                          style={{
+                            padding: '0.75rem 1.5rem',
+                            background: '#f1f5f9',
+                            color: '#475569',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontSize: '0.95rem',
+                            fontWeight: 600
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1834,7 +1889,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                 }}
               />
             </div>
-            <div>
+            {/* <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
                 Topic
               </label>
@@ -1851,7 +1906,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                   fontSize: '0.95rem'
                 }}
               />
-            </div>
+            </div> */}
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
                 Class *
@@ -1888,7 +1943,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                 }}
               />
             </div>
-            <div>
+            {/* <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
                 Duration
               </label>
@@ -1905,7 +1960,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                   fontSize: '0.95rem'
                 }}
               />
-            </div>
+            </div> */}
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
                 Description
@@ -2554,12 +2609,206 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
     );
   };
 
+  const renderAttendance = () => {
+    // Filter assigned classes to only show classes where teacher is class teacher
+    // classTeacherClassIds contains the IDs from backend (where teacher is class teacher)
+    const uniqueClassIds = new Set<string>();
+    const allUniqueClasses = assignedClasses.filter((cls) => {
+      console.log('Processing class for uniqueness:', cls.classId, cls.className);
+      // Only include each classId once
+      if (!uniqueClassIds.has(cls.classId)) {
+        uniqueClassIds.add(cls.classId);
+        return true;
+      }
+      return false;
+    });
+
+    console.log('===== ATTENDANCE FILTERING DEBUG =====');
+    console.log('allUniqueClasses:', allUniqueClasses.map(c => ({ id: c.classId, name: c.className })));
+    console.log('classTeacherClassIds array:', classTeacherClassIds);
+    console.log('classTeacherClassIds type:', typeof classTeacherClassIds);
+    
+    // Filter to only show classes where teacher is class teacher
+    const classTeacherClasses = allUniqueClasses.filter(cls => {
+      const classId = parseInt(cls.classId);
+      const isIncluded = classTeacherClassIds.includes(classId);
+      console.log("isIncluded check:", { classId, isIncluded });
+      // console.log(`Class ${cls.classId} (${cls.className}) - parsed: ${classId}, included: ${isIncluded}`);
+      return isIncluded;
+    });
+    
+    console.log('Filtered classTeacherClasses:', classTeacherClasses.map(c => ({ id: c.classId, name: c.className })));
+    console.log('======================================');
+
+    if (classTeacherClasses.length === 0) {
+      return (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '3rem',
+          backgroundColor: '#fff',
+          borderRadius: '12px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📋</div>
+          <h3 style={{ color: '#64748b', marginBottom: '0.5rem' }}>No Class Teacher Assignment</h3>
+          <p style={{ color: '#94a3b8' }}>
+            This tab is only available for class teachers. If you are a class teacher, please contact the administrator.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="attendance-section">
+        <div style={{ 
+          marginBottom: '2rem',
+          padding: '1.5rem',
+          backgroundColor: '#ffffff',
+          borderRadius: '12px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <div>
+            <h2 style={{ margin: 0, color: '#1f2937', fontSize: '1.5rem', fontWeight: '700' }}>
+              ✓ Class Attendance
+            </h2>
+            <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.9rem' }}>
+              Mark attendance for your assigned class
+            </p>
+          </div>
+        </div>
+
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+          gap: '1.5rem'
+        }}>
+          {classTeacherClasses.map((cls) => (
+            <div 
+              key={cls.classId}
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer',
+                border: '2px solid transparent'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                e.currentTarget.style.borderColor = '#3b82f6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                e.currentTarget.style.borderColor = 'transparent';
+              }}
+            >
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'flex-start',
+                marginBottom: '1rem'
+              }}>
+                <div>
+                  <h3 style={{ 
+                    margin: 0, 
+                    fontSize: '1.25rem', 
+                    color: '#1f2937',
+                    fontWeight: '600'
+                  }}>
+                    {cls.className} - {cls.section}
+                  </h3>
+                  <p style={{ 
+                    margin: '0.5rem 0 0', 
+                    color: '#6b7280',
+                    fontSize: '0.9rem'
+                  }}>
+                    Class ID: {cls.classId}
+                  </p>
+                </div>
+                <div style={{
+                  backgroundColor: '#dbeafe',
+                  color: '#1e40af',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '20px',
+                  fontSize: '0.85rem',
+                  fontWeight: '600'
+                }}>
+                  {studentCounts[cls.classId] || 0} Students
+                </div>
+              </div>
+
+              <button
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#059669'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
+                onClick={() => {
+                  setSelectedClassForAttendance(cls);
+                  setShowMarkAttendance(true);
+                }}
+              >
+                <span>✓</span>
+                <span>Mark Attendance</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'home':
         return renderHome();
       case 'classes':
         return renderAssignedClasses();
+      case 'attendance':
+        return renderAttendance();
+      case 'promotion':
+        // Show promotion assignment for the class teacher's class
+        console.log('===== PROMOTION TAB DEBUG =====');
+        console.log('classTeacherClassIds:', classTeacherClassIds);
+        console.log('classTeacherClassIds[0]:', classTeacherClassIds[0]);
+        console.log('activeSessionId:', activeSessionId);
+        console.log('===============================');
+        
+        if (classTeacherClassIds.length > 0 && activeSessionId) {
+          return <PromotionAssignment classId={classTeacherClassIds[0]} sessionId={activeSessionId} />;
+        } else {
+          return (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '3rem',
+              backgroundColor: '#fff',
+              borderRadius: '12px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}>
+              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📋</div>
+              <h3 style={{ color: '#64748b', marginBottom: '0.5rem' }}>No Class Teacher Assignment</h3>
+              <p style={{ color: '#94a3b8' }}>
+                This feature is only available for class teachers.
+              </p>
+            </div>
+          );
+        }
       case 'queries':
         return renderQueries();
       case 'lectures':
@@ -2609,6 +2858,18 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
               onClick={() => setActiveTab('classes')}
             >
               📚 Assigned Classes
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
+              onClick={() => setActiveTab('attendance')}
+            >
+              ✓ Attendance
+            </button>
+            <button
+              className={`nav-item ${activeTab === 'promotion' ? 'active' : ''}`}
+              onClick={() => setActiveTab('promotion')}
+            >
+              ⬆️ Promote Students
             </button>
             <button
               className={`nav-item ${activeTab === 'queries' ? 'active' : ''}`}

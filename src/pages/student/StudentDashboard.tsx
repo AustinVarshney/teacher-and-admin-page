@@ -19,6 +19,8 @@ import galleryService from '../../services/galleryService';
 import PreviousSchoolingService, { PreviousSchoolingRecord } from '../../services/previousSchoolingService';
 import PeriodSettingsService, { PeriodSettings } from '../../services/periodSettingsService';
 import CloudinaryUploadWidget from '../../components/CloudinaryUploadWidget';
+import MarksheetTable from '../../components/MarksheetTable';
+import PreviousSchoolingTable from '../../components/PreviousSchoolingTable';
 
 interface StudentDashboardProps {
   onLogout: () => void;
@@ -37,11 +39,11 @@ type PreviousClassRecord = { id: string; classLabel: string; schoolName: string;
 // Helper function to safely format dates
 const formatDateTime = (dateValue: any): string => {
   if (!dateValue) return 'N/A';
-  
+
   try {
     // Handle different date formats
     let date: Date;
-    
+
     if (typeof dateValue === 'string') {
       // Try parsing ISO string or other formats
       date = new Date(dateValue);
@@ -61,12 +63,12 @@ const formatDateTime = (dateValue: any): string => {
     } else {
       return 'N/A';
     }
-    
+
     // Check if date is valid
     if (isNaN(date.getTime())) {
       return 'N/A';
     }
-    
+
     return date.toLocaleString();
   } catch (error) {
     console.error('Error formatting date:', dateValue, error);
@@ -102,13 +104,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
   const [studentResults, setStudentResults] = useState<StudentResultsDTO | null>(null);
   const [resultsLoading, setResultsLoading] = useState(false);
   const [resultsError, setResultsError] = useState<string | null>(null);
+  const [showMarksheetView, setShowMarksheetView] = useState(false);
   const [videoLectures, setVideoLectures] = useState<VideoLectureType[]>([]);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [previousSchoolingRecords, setPreviousSchoolingRecords] = useState<PreviousSchoolingRecord[]>([]);
   const [previousSchoolingLoading, setPreviousSchoolingLoading] = useState(false);
   const [previousSchoolingError, setPreviousSchoolingError] = useState<string | null>(null);
-  
+
   // Period settings state
   const [periodSettings, setPeriodSettings] = useState<PeriodSettings>({
     periodDuration: 40,
@@ -116,7 +119,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
     lunchPeriod: 4,
     lunchDuration: 60
   });
-  
+
   // Attendance month selection state
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -145,21 +148,18 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         // Fetch current logged-in student's details using /api/students/me
         // This endpoint is secured for ROLE_STUDENT and doesn't require PAN parameter
         const studentData = await StudentService.getCurrentStudent();
-        console.log('Student data from backend:', studentData);
-        console.log('Student classId field:', studentData.classId);
-        console.log('Student currentClassId field:', studentData.currentClassId);
         
         // Try multiple possible field names for class ID
         const classId = studentData.classId || studentData.currentClassId || studentData.class_id;
-        console.log('Resolved class ID:', classId);
         
         setStudent({
           name: studentData.name || 'Student',
           currentClass: studentData.currentClass || studentData.className || 'N/A',
           pan: studentData.panNumber || 'N/A',
           photo: studentData.photo || null,
-          schoolName: 'Mauritius International School',
-          schoolLogo: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-8IRdKonj2lw5KF7osJq3GRJSOrjKiKck0g&s',
+          schoolName: studentData.schoolName || 'School Learning Management System',
+          schoolLogo: studentData.schoolLogo || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-8IRdKonj2lw5KF7osJq3GRJSOrjKiKck0g&s',
+          schoolTagline: studentData.schoolTagline || 'Learn • Lead • Succeed',
           classId: classId,
           section: studentData.section || 'A',
           sessionId: studentData.sessionId
@@ -168,20 +168,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         // Fetch timetable for student's class - ONLY if classId is valid
         if (classId && classId !== 'undefined' && !isNaN(Number(classId))) {
           try {
-            console.log('Fetching timetable for class ID:', classId);
-            console.log('Calling TimetableService.getTimetableByClass with:', classId);
             const timetableData = await TimetableService.getTimetableByClass(classId);
-            console.log('Raw timetable data from backend:', timetableData);
-            console.log('Timetable entries count:', timetableData?.length || 0);
+            
+            // Get class teacher ID directly from student data (no API call needed)
+            const classTeacherId = studentData.classTeacherId ? Number(studentData.classTeacherId) : null;
             
             if (!timetableData || timetableData.length === 0) {
               console.warn('Timetable is empty or null');
               setTimetable([]);
               setEnquiryContacts([]);
             } else {
-              // Log first entry to see structure
-              console.log('First timetable entry structure:', timetableData[0]);
-              
               // Transform timetable data to match component format
               const transformedTimetable = timetableData.map((entry: any, index: number) => ({
                 id: entry.id?.toString() || `t${index}`,
@@ -192,20 +188,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 subject: entry.subjectName || entry.subject || 'Subject',
                 teacher: entry.teacherName || entry.teacher || 'Teacher'
               }));
-              
+
               setTimetable(transformedTimetable);
 
               // Extract unique teachers from timetable and fetch their contact details
               const uniqueTeacherMap = new Map<number, { subjectName: string; teacherName: string; contactNumber: string }>();
               timetableData.forEach((entry: any, idx: number) => {
-                console.log(`Processing timetable entry ${idx}:`, {
-                  teacherId: entry.teacherId,
-                  teacherName: entry.teacherName,
-                  subjectName: entry.subjectName,
-                  teacherContactNumber: entry.teacherContactNumber,
-                  fullEntry: entry
-                });
-                
+
                 if (entry.teacherId && entry.teacherName && entry.subjectName) {
                   if (!uniqueTeacherMap.has(entry.teacherId)) {
                     uniqueTeacherMap.set(entry.teacherId, {
@@ -213,9 +202,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                       teacherName: entry.teacherName,
                       contactNumber: entry.teacherContactNumber || 'N/A'
                     });
-                    console.log(`Added teacher ${entry.teacherId}: ${entry.teacherName} - ${entry.subjectName} - ${entry.teacherContactNumber || 'N/A'}`);
-                  } else {
-                    console.log(`Teacher ${entry.teacherId} already exists in map`);
                   }
                 } else {
                   console.warn(`Skipping entry ${idx} - missing required fields:`, {
@@ -226,19 +212,19 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 }
               });
 
-              console.log('Unique teachers found:', Array.from(uniqueTeacherMap.entries()));
-              console.log('Total unique teachers:', uniqueTeacherMap.size);
+              // Create enquiry contacts directly from timetable data and mark class teacher
+              const teacherContacts = Array.from(uniqueTeacherMap.entries()).map(([teacherId, info]) => {
+                const isClassTeacher = classTeacherId !== null && Number(teacherId) === Number(classTeacherId);
+                
+                return {
+                  id: teacherId.toString(),
+                  subject: info.subjectName,
+                  teacher: info.teacherName,
+                  phone: info.contactNumber,
+                  isClassTeacher: isClassTeacher // Mark if this is the class teacher
+                };
+              });
 
-              // Create enquiry contacts directly from timetable data (no need to fetch teacher details separately)
-              const teacherContacts = Array.from(uniqueTeacherMap.entries()).map(([teacherId, info]) => ({
-                id: teacherId.toString(),
-                subject: info.subjectName,
-                teacher: info.teacherName,
-                phone: info.contactNumber
-              }));
-
-              console.log('Final enquiry contacts:', teacherContacts);
-              console.log('Total enquiry contacts created:', teacherContacts.length);
               setEnquiryContacts(teacherContacts);
             }
           } catch (timetableError: any) {
@@ -256,7 +242,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         // Fetch events from database
         try {
           const eventsData = await EventService.getAllEvents();
-          
+
           // Transform events data to match component format
           const transformedEvents = eventsData.map((event: any) => ({
             id: event.id?.toString() || `e${Math.random()}`,
@@ -266,7 +252,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
             description: event.description || '',
             type: (event.type?.toLowerCase() || 'academic') as 'sports' | 'cultural' | 'academic' | 'meeting'
           }));
-          
+
           setEvents(transformedEvents);
         } catch (eventsError) {
           console.warn('No events data available:', eventsError);
@@ -276,7 +262,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         // Fetch holidays from database
         try {
           const holidaysData = await HolidayService.getAllHolidays();
-          
+
           // Transform holidays data to match component format
           // Backend returns: { id, startDate, endDate, occasion, sessionId }
           // Frontend expects: { id, date, name, startDate, endDate }
@@ -287,7 +273,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
             endDate: holiday.endDate || holiday.startDate || new Date().toISOString().split('T')[0],
             name: holiday.occasion || 'Holiday',
           }));
-          
+
           setHolidays(transformedHolidays);
         } catch (holidaysError) {
           console.warn('No holidays data available:', holidaysError);
@@ -315,7 +301,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         // Fetch period settings from backend
         try {
           const settings = await PeriodSettingsService.getPeriodSettings();
-          console.log('Period settings loaded:', settings);
           setPeriodSettings(settings);
         } catch (periodError) {
           console.warn('Using default period settings:', periodError);
@@ -354,10 +339,33 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
   const fetchGalleryImages = async () => {
     try {
-      // Fetch gallery images by student's session ID if available
-      const sessionId = student?.sessionId;
-      const images = await galleryService.getAllImages(sessionId);
-      setGallery(images.map(img => ({
+      // Fetch gallery images from all sessions the student was enrolled in
+      // First, get all previous schooling records to know which sessions the student was in
+      const records = await PreviousSchoolingService.getMyPreviousSchoolingRecords();
+      const sessionIds = records.map(record => record.sessionId);
+      
+      // Also include current session if available
+      if (student?.sessionId && !sessionIds.includes(student.sessionId)) {
+        sessionIds.push(student.sessionId);
+      }
+      
+      // Fetch gallery images for all these sessions
+      const allImages: any[] = [];
+      for (const sessionId of sessionIds) {
+        try {
+          const images = await galleryService.getAllImages(sessionId);
+          allImages.push(...images);
+        } catch (err) {
+          console.warn(`No gallery images for session ${sessionId}:`, err);
+        }
+      }
+      
+      // Remove duplicates by ID
+      const uniqueImages = Array.from(
+        new Map(allImages.map(img => [img.id, img])).values()
+      );
+      
+      setGallery(uniqueImages.map(img => ({
         id: img.id.toString(),
         title: img.title || 'Gallery Image',
         imageUrl: img.imageUrl,
@@ -365,7 +373,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         createdAt: img.createdAt
       })));
     } catch (err) {
-      console.warn('No gallery images available:', err);
+      console.warn('Error fetching gallery images:', err);
       setGallery([]);
     }
   };
@@ -448,11 +456,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
       setTcSuccess(null);
 
       await TransferCertificateService.requestTransferCertificate(tcFormData);
-      
+
       // Refresh the requests list
       const requests = await TransferCertificateService.getMyTransferCertificateRequests();
       setTcRequests(requests || []);
-      
+
       // Reset form and close modal
       setTcFormData({
         reason: '',
@@ -463,10 +471,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
       });
       setShowTCForm(false);
       setTcSuccess('Transfer Certificate request submitted successfully!');
-      
+
       // Clear success message after 5 seconds
       setTimeout(() => setTcSuccess(null), 5000);
-      
+
     } catch (err: any) {
       setTcError(err.message || 'Failed to submit TC request');
     } finally {
@@ -494,10 +502,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
     if (!attendanceData || attendanceData.length === 0) {
       return { present: 0, absent: 0 };
     }
-    
+
     let totalPresent = 0;
     let totalAbsent = 0;
-    
+
     // attendanceData is an array of AttendanceInfoDto objects
     // Each has an 'attendances' array with AttendenceResponse objects
     attendanceData.forEach((attendanceInfo: any) => {
@@ -511,7 +519,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         });
       }
     });
-    
+
     console.log('Calculated attendance:', { present: totalPresent, absent: totalAbsent });
     return { present: totalPresent, absent: totalAbsent };
   }, [attendanceData]);
@@ -632,22 +640,22 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
   }, [attendance.present, attendance.absent]);
 
   // Attendance calendar - Use real data from API
-  const formatKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  
+  const formatKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
   // Build holiday dates set to include all dates in the range (startDate to endDate)
   const holidayDates = useMemo(() => {
     const dates = new Set<string>();
-    
+
     holidays.forEach(h => {
       const startDate = new Date(h.startDate || h.date);
       const endDate = new Date(h.endDate || h.startDate || h.date);
-      
+
       // Validate dates
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         console.warn('Invalid holiday date:', h);
         return;
       }
-      
+
       // Add all dates in the range (inclusive)
       const currentDate = new Date(startDate);
       while (currentDate <= endDate) {
@@ -656,56 +664,56 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         currentDate.setDate(currentDate.getDate() + 1);
       }
     });
-    
+
     return dates;
   }, [holidays]);
-  
+
   const buildAttendanceSets = () => {
     const present = new Set<string>();
     const absent = new Set<string>();
-    
+
     // Helper function to parse "dd-MM-yyyy HH:mm:ss" format from backend
     const parseBackendDate = (dateStr: string): Date | null => {
       try {
         // Format: "dd-MM-yyyy HH:mm:ss" e.g., "05-10-2025 14:30:00"
         const parts = dateStr.split(' ');
         if (parts.length !== 2) return null;
-        
+
         const dateParts = parts[0].split('-'); // [dd, MM, yyyy]
         if (dateParts.length !== 3) return null;
-        
+
         const day = parseInt(dateParts[0], 10);
         const month = parseInt(dateParts[1], 10) - 1; // Month is 0-indexed in JS
         const year = parseInt(dateParts[2], 10);
-        
+
         if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-        
+
         return new Date(year, month, day);
       } catch (e) {
         console.error('Error parsing date:', dateStr, e);
         return null;
       }
     };
-    
+
     // Process real attendance data from API
     // attendanceData is an array of AttendanceInfoDto objects
     if (attendanceData && attendanceData.length > 0) {
       // console.log('Building attendance sets from data:', attendanceData);
-      
+
       attendanceData.forEach((attendanceInfo: any) => {
         if (attendanceInfo.attendances && Array.isArray(attendanceInfo.attendances)) {
           attendanceInfo.attendances.forEach((record: any) => {
             if (record.date) {
               // Parse the date - backend returns format "dd-MM-yyyy HH:mm:ss"
               const dateObj = parseBackendDate(record.date);
-              
+
               if (dateObj && !isNaN(dateObj.getTime())) {
                 const dateStr = formatKey(dateObj);
-                
+
                 // Check if student was present
                 if (record.present === true) {
                   present.add(dateStr);
-                  console.log('Added present date:', record.date, '→', dateStr);
+                  // console.log('Added present date:', record.date, '→', dateStr);
                 } else if (record.present === false) {
                   absent.add(dateStr);
                   // console.lo g('Added absent date:', record.date, '→', dateStr);
@@ -717,11 +725,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
           });
         }
       });
-      
+
       // console.log('Present dates:', Array.from(present));
       // console.log('Absent dates:', Array.from(absent));
     }
-    
+
     return { present, absent };
   };
   const { present: presentDates, absent: absentDates } = buildAttendanceSets();
@@ -747,7 +755,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
       alert('Please select a teacher and enter your question.');
       return;
     }
-    
+
     try {
       await QueryService.raiseStudentQuery({
         teacherId: selectedQueryTeacher,
@@ -825,14 +833,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 <img src={student?.schoolLogo || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-8IRdKonj2lw5KF7osJq3GRJSOrjKiKck0g&s'} alt="School logo" />
               </div>
               <div>
-                <h1 className="school-name">{student?.schoolName || 'Mauritius International School'}</h1>
-                <p className="school-motto">Learn • Lead • Succeed</p>
+                <h1 className="school-name">{student?.schoolName || 'School Learning Management System'}</h1>
+                <p className="school-motto">{student?.schoolTagline || 'Learn • Lead • Succeed'}</p>
               </div>
             </div>
           </div>
           <div className="header-right">
             <div className="notification-wrapper">
-              <button 
+              <button
                 className={`notification-button ${showNotifications ? 'open' : ''}`}
                 onClick={() => setShowNotifications(!showNotifications)}
                 aria-label="Notifications"
@@ -849,7 +857,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                       <h3>Notifications ({unreadCount} unread)</h3>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         {unreadCount > 0 && (
-                          <button 
+                          <button
                             onClick={markAllAsRead}
                             style={{
                               padding: '0.5rem 1rem',
@@ -876,17 +884,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                       </div>
                     ) : (
                       notifications.map(notification => (
-                        <div 
-                          key={notification.id} 
+                        <div
+                          key={notification.id}
                           className="notification-item"
                           onClick={() => !notification.isRead && notification.id && markNotificationAsRead(notification.id)}
                           style={{
                             cursor: notification.isRead ? 'default' : 'pointer',
                             background: notification.isRead ? '#f9fafb' : 'white',
-                            borderLeft: `4px solid ${
-                              notification.priority === 'HIGH' ? '#ef4444' :
-                              notification.priority === 'MEDIUM' ? '#f59e0b' : '#10b981'
-                            }`,
+                            borderLeft: `4px solid ${notification.priority === 'HIGH' ? '#ef4444' :
+                                notification.priority === 'MEDIUM' ? '#f59e0b' : '#10b981'
+                              }`,
                             padding: '1rem',
                             marginBottom: '0.5rem',
                             position: 'relative'
@@ -899,7 +906,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                               {notification.priority === 'LOW' && '🟢'}
                             </div>
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: '600', fontSize: '0.95rem', marginBottom: '0.25rem' }}>
+                              <div style={{ fontWeight: '600', fontSize: '0.95rem', marginBottom: '0.25rem', color: '#111827' }}>
                                 {notification.title}
                               </div>
                               <div style={{ fontSize: '0.9rem', color: '#4b5563', marginBottom: '0.5rem' }}>
@@ -1094,8 +1101,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
             <div style={{ textAlign: 'center', padding: '3rem', color: '#dc2626' }}>
               <h3>⚠️ Error Loading Data</h3>
               <p>{error}</p>
-              <button 
-                className="submit-btn" 
+              <button
+                className="submit-btn"
                 style={{ marginTop: '1rem' }}
                 onClick={() => window.location.reload()}
               >
@@ -1107,7 +1114,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {/* Student Profile - Home Tab */}
         {!loading && !error && student && activeTab === 'home' && (
-          <section className="profile-section" style={{marginBottom: '0'}}>
+          <section className="profile-section" style={{ marginBottom: '0' }}>
             <SectionHeader icon="👤" title="Student Profile" />
             <div className="profile-info">
               {student.photo ? (
@@ -1126,7 +1133,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
               )}
               <div className="profile-details">
                 <p><strong>Name:</strong> {student.name}</p>
-                <p><strong>Current Class:</strong> {student.currentClass} - Section {student.section}</p>
+                <p><strong>Current Class:</strong> {student.currentClass}</p>
                 <p><strong>PAN:</strong> {student.pan}</p>
               </div>
             </div>
@@ -1137,42 +1144,44 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
           <section className="query-section">
             <SectionHeader icon="📞" title="Teacher Contacts" />
             {loading ? (
-              <div className="loading-message" style={{textAlign: 'center', padding: '2rem'}}>Loading teacher contacts...</div>
+              <div className="loading-message" style={{ textAlign: 'center', padding: '2rem' }}>Loading teacher contacts...</div>
             ) : enquiryContacts.length === 0 ? (
-              <div className="no-data-message" style={{textAlign: 'center', padding: '2rem'}}>
+              <div className="no-data-message" style={{ textAlign: 'center', padding: '2rem' }}>
                 <p>No teacher contact information available.</p>
                 <p>Teacher contacts will appear here once your timetable is assigned.</p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {enquiryContacts.map(c => (
-                  <div key={c.id} style={{
-                    padding: '1rem',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    backgroundColor: c.isClassTeacher ? '#f0fdf4' : '#fff',
-                    borderLeft: c.isClassTeacher ? '4px solid #10b981' : '1px solid #e5e7eb'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <strong style={{ fontSize: '1.1rem', color: '#1f2937' }}>{c.subject}</strong>
-                        <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280' }}>{c.teacher}</p>
+                {enquiryContacts.map(c => {
+                  return (
+                    <div key={c.id} style={{
+                      padding: '1rem',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      backgroundColor: c.isClassTeacher ? '#f0fdf4' : '#fff',
+                      borderLeft: c.isClassTeacher ? '4px solid #10b981' : '1px solid #e5e7eb'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <strong style={{ fontSize: '1.1rem', color: '#1f2937' }}>{c.subject}</strong>
+                          <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280' }}>{c.teacher}</p>
+                        </div>
+                        {c.isClassTeacher && (
+                          <span style={{
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '12px',
+                            fontSize: '0.85rem',
+                            backgroundColor: '#d1fae5',
+                            color: '#065f46',
+                            fontWeight: '500'
+                          }}>
+                            Class Teacher
+                          </span>
+                        )}
                       </div>
-                      {c.isClassTeacher && (
-                        <span style={{
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '12px',
-                          fontSize: '0.85rem',
-                          backgroundColor: '#d1fae5',
-                          color: '#065f46',
-                          fontWeight: '500'
-                        }}>
-                          Class Teacher
-                        </span>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -1180,15 +1189,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'lectures' && (
           <section className="events-section">
-            <SectionHeader icon="🎥" title="Live Class & Video Lectures" />
+            <SectionHeader icon="🎥" title="Video Lectures" />
             {loading ? (
-              <div className="loading-message" style={{textAlign: 'center', padding: '2rem'}}>
+              <div className="loading-message" style={{ textAlign: 'center', padding: '2rem' }}>
                 Loading video lectures...
               </div>
             ) : videoLectures.length === 0 ? (
-              <div className="no-data-message" style={{textAlign: 'center', padding: '2rem'}}>
+              <div className="no-data-message" style={{ textAlign: 'center', padding: '2rem' }}>
                 <p>📹 No video lectures available yet.</p>
-                <p style={{fontSize: '0.9rem', color: '#666'}}>
+                <p style={{ fontSize: '0.9rem', color: '#666' }}>
                   Video lectures uploaded by your teachers will appear here.
                 </p>
               </div>
@@ -1197,7 +1206,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 {videoLectures.map(v => {
                   const thumbnailUrl = VideoLectureService.getYouTubeThumbnail(v.youtubeLink);
                   const embedUrl = VideoLectureService.getYouTubeEmbedUrl(v.youtubeLink);
-                  
+
                   return (
                     <div key={v.id} className="event-card academic" style={{
                       display: 'flex',
@@ -1228,33 +1237,36 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                           ▶️
                         </div>
                       </div>
-                      
+
                       {/* Content */}
-                      <div className="event-name" style={{fontSize: '1.1rem', fontWeight: '600'}}>
+                      <div className="event-name" style={{ fontSize: '1.1rem', fontWeight: '600' }}>
                         {v.title}
                       </div>
-                      <div className="event-date" style={{marginTop: '0.5rem'}}>
+                      <div className="event-name" style={{ fontSize: '1.1rem', fontWeight: '500' }}>
+                        {v.description}
+                      </div>
+                      <div className="event-date" style={{ marginTop: '0.5rem' }}>
                         📚 {v.subject}
                       </div>
                       {v.topic && (
-                        <div style={{fontSize: '0.85rem', color: '#666', marginTop: '0.25rem'}}>
+                        <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
                           Topic: {v.topic}
                         </div>
                       )}
                       {v.teacherName && (
-                        <div style={{fontSize: '0.85rem', color: '#666', marginTop: '0.25rem'}}>
+                        <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
                           👨‍🏫 {v.teacherName}
                         </div>
                       )}
                       {v.duration && (
-                        <div style={{fontSize: '0.85rem', color: '#666', marginTop: '0.25rem'}}>
+                        <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
                           ⏱️ {v.duration}
                         </div>
                       )}
-                      
-                      <button 
-                        className="submit-btn" 
-                        style={{marginTop: 'auto', width: '100%'}}
+
+                      <button
+                        className="submit-btn"
+                        style={{ marginTop: 'auto', width: '100%' }}
                         onClick={() => window.open(embedUrl, '_blank')}
                       >
                         ▶️ Watch Video
@@ -1270,12 +1282,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         {/* Timetable Tab - Using API Data */}
         {!loading && !error && activeTab === 'timetable' && (() => {
           const weekDays = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-          
+
           // Generate periods dynamically based on period settings
           const generatePeriods = () => {
             const periods: any[] = [];
             const { periodDuration, schoolStartTime, lunchPeriod, lunchDuration } = periodSettings;
-            
+
             // Helper to add minutes to time
             const addMinutesToTime = (time: string, minutes: number): string => {
               const [hours, mins] = time.split(':').map(Number);
@@ -1284,7 +1296,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
               const newMins = totalMinutes % 60;
               return `${String(newHours).padStart(2, '0')}:${String(newMins).padStart(2, '0')}`;
             };
-            
+
             // Helper to format time for display
             const formatTime = (time: string): string => {
               const [hours, mins] = time.split(':').map(Number);
@@ -1292,22 +1304,22 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
               const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
               return `${String(displayHours).padStart(2, '0')}:${String(mins).padStart(2, '0')} ${period}`;
             };
-            
+
             let currentTime = schoolStartTime;
-            
+
             for (let i = 1; i <= 8; i++) {
               const periodStart = currentTime;
               const periodEnd = addMinutesToTime(currentTime, periodDuration);
-              
+
               periods.push({
                 number: i,
                 time: `${formatTime(periodStart)} - ${formatTime(periodEnd)}`,
                 start: periodStart,
                 end: periodEnd
               });
-              
+
               currentTime = periodEnd;
-              
+
               // Add lunch break after the specified period
               if (i === lunchPeriod) {
                 const lunchStart = currentTime;
@@ -1322,16 +1334,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 currentTime = lunchEnd;
               }
             }
-            
+
             return periods;
           };
-          
+
           const periodsData = generatePeriods();
           const periods = periodsData.map(p => p.number);
           const periodTimes = periodsData.map(p => p.time);
 
           // Organize timetable data by day and period
-          const timetableGrid: {[key: string]: {[key: number]: any}} = {};
+          const timetableGrid: { [key: string]: { [key: number]: any } } = {};
           weekDays.forEach(day => {
             timetableGrid[day] = {};
           });
@@ -1362,24 +1374,24 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 </div>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ 
-                    width: '100%', 
+                  <table style={{
+                    width: '100%',
                     borderCollapse: 'collapse',
                     marginBottom: '2rem',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
                   }}>
                     <thead>
                       <tr style={{ backgroundColor: '#3b82f6', color: 'white' }}>
-                        <th style={{ 
-                          padding: '1rem', 
+                        <th style={{
+                          padding: '1rem',
                           border: '1px solid #ddd',
                           fontWeight: '600',
                           textAlign: 'center',
                           minWidth: '120px'
                         }}>Day / Period</th>
                         {periods.map((period, idx) => (
-                          <th key={idx} style={{ 
-                            padding: '1rem', 
+                          <th key={idx} style={{
+                            padding: '1rem',
                             border: '1px solid #ddd',
                             fontWeight: '600',
                             textAlign: 'center',
@@ -1406,35 +1418,35 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                         const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
                         const daysOfWeek = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
                         const targetDayIndex = daysOfWeek.indexOf(day);
-                        
+
                         // Calculate the date for this weekday
                         const daysFromToday = targetDayIndex - currentDay;
                         const targetDate = new Date(today);
                         targetDate.setDate(today.getDate() + daysFromToday);
                         targetDate.setHours(0, 0, 0, 0);
-                        
+
                         // Check if this day falls within any holiday range
                         const matchingHoliday = holidays.find(holiday => {
                           if (!holiday.startDate || !holiday.endDate) return false;
-                          
+
                           const holidayStart = new Date(holiday.startDate);
                           holidayStart.setHours(0, 0, 0, 0);
                           const holidayEnd = new Date(holiday.endDate);
                           holidayEnd.setHours(0, 0, 0, 0);
-                          
+
                           return targetDate >= holidayStart && targetDate <= holidayEnd;
                         });
-                        
+
                         const isHoliday = !!matchingHoliday;
-                        
+
                         return (
-                          <tr key={day} style={{ 
-                            backgroundColor: isHoliday 
-                              ? '#fef2f2' 
+                          <tr key={day} style={{
+                            backgroundColor: isHoliday
+                              ? '#fef2f2'
                               : (dayIdx % 2 === 0 ? '#f9fafb' : 'white')
                           }}>
-                            <td style={{ 
-                              padding: '1rem', 
+                            <td style={{
+                              padding: '1rem',
                               border: '1px solid #ddd',
                               fontWeight: '600',
                               backgroundColor: isHoliday ? '#fee2e2' : '#e5e7eb',
@@ -1442,10 +1454,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                               position: 'relative'
                             }}>
                               {isHoliday && (
-                                <span style={{ 
-                                  position: 'absolute', 
-                                  left: '0.5rem', 
-                                  top: '50%', 
+                                <span style={{
+                                  position: 'absolute',
+                                  left: '0.5rem',
+                                  top: '50%',
                                   transform: 'translateY(-50%)',
                                   fontSize: '1.2rem'
                                 }}>
@@ -1466,8 +1478,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                             {periods.map((period, periodIdx) => {
                               if (period === 'LUNCH') {
                                 return (
-                                  <td key={periodIdx} style={{ 
-                                    padding: '1rem', 
+                                  <td key={periodIdx} style={{
+                                    padding: '1rem',
                                     border: '1px solid #ddd',
                                     backgroundColor: isHoliday ? '#fed7d7' : '#fef3c7',
                                     textAlign: 'center',
@@ -1478,15 +1490,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                                   </td>
                                 );
                               }
-                              
+
                               const slot = timetableGrid[day][period as number];
                               return (
-                                <td key={periodIdx} style={{ 
-                                  padding: '0.75rem', 
+                                <td key={periodIdx} style={{
+                                  padding: '0.75rem',
                                   border: '1px solid #ddd',
                                   textAlign: 'center',
-                                  backgroundColor: isHoliday 
-                                    ? '#fecaca' 
+                                  backgroundColor: isHoliday
+                                    ? '#fecaca'
                                     : (period === 8 ? '#f3e8ff' : 'inherit'),
                                   verticalAlign: 'middle',
                                   position: 'relative'
@@ -1506,15 +1518,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                                     </div>
                                   ) : slot ? (
                                     <div>
-                                      <div style={{ 
-                                        fontWeight: '600', 
+                                      <div style={{
+                                        fontWeight: '600',
                                         color: '#1f2937',
                                         marginBottom: '0.25rem'
                                       }}>
                                         {slot.subject}
                                       </div>
-                                      <div style={{ 
-                                        fontSize: '0.85rem', 
+                                      <div style={{
+                                        fontSize: '0.85rem',
                                         color: '#6b7280'
                                       }}>
                                         {slot.teacher}
@@ -1535,43 +1547,43 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                   </table>
 
                   {/* Teacher Legend */}
-                  <div style={{ 
+                  <div style={{
                     marginTop: '1.5rem',
                     padding: '1.5rem',
                     backgroundColor: '#f9fafb',
                     borderRadius: '8px',
                     border: '1px solid #e5e7eb'
                   }}>
-                    <h3 style={{ 
-                      marginBottom: '1rem', 
+                    <h3 style={{
+                      marginBottom: '1rem',
                       fontSize: '1.1rem',
                       fontWeight: '600',
                       color: '#1f2937'
                     }}>
                       📚 Teachers & Subjects
                     </h3>
-                    <div style={{ 
-                      display: 'grid', 
+                    <div style={{
+                      display: 'grid',
                       gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
                       gap: '1rem'
                     }}>
                       {Array.from(teacherSubjectMap.entries()).map(([teacher, subjects]) => (
-                        <div key={teacher} style={{ 
+                        <div key={teacher} style={{
                           padding: '0.75rem 1rem',
                           backgroundColor: 'white',
                           borderRadius: '6px',
                           border: '1px solid #d1d5db',
                           boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                         }}>
-                          <div style={{ 
-                            fontWeight: '600', 
+                          <div style={{
+                            fontWeight: '600',
                             color: '#3b82f6',
                             marginBottom: '0.5rem'
                           }}>
                             👨‍🏫 {teacher}
                           </div>
-                          <div style={{ 
-                            fontSize: '0.9rem', 
+                          <div style={{
+                            fontSize: '0.9rem',
                             color: '#6b7280'
                           }}>
                             {Array.from(subjects).join(', ')}
@@ -1582,7 +1594,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                   </div>
 
                   {/* Legend for special periods */}
-                  <div style={{ 
+                  <div style={{
                     marginTop: '1rem',
                     display: 'flex',
                     gap: '1.5rem',
@@ -1592,9 +1604,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                     borderRadius: '6px'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <div style={{ 
-                        width: '20px', 
-                        height: '20px', 
+                      <div style={{
+                        width: '20px',
+                        height: '20px',
                         backgroundColor: '#fef3c7',
                         border: '1px solid #fbbf24',
                         borderRadius: '4px'
@@ -1602,9 +1614,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                       <span style={{ fontSize: '0.9rem' }}>Lunch Break</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <div style={{ 
-                        width: '20px', 
-                        height: '20px', 
+                      <div style={{
+                        width: '20px',
+                        height: '20px',
                         backgroundColor: '#f3e8ff',
                         border: '1px solid #8b5cf6',
                         borderRadius: '4px'
@@ -1623,9 +1635,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
           const monthIndex = selectedMonth;
           const monthName = new Date(year, monthIndex).toLocaleString('default', { month: 'long' });
           const weeks = buildWeeks(year, monthIndex);
-          const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-          const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-          
+          const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          const formatDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
           // Generate year options (current year and 2 years back)
           const currentYear = new Date().getFullYear();
           const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
@@ -1633,12 +1645,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
             'January', 'February', 'March', 'April', 'May', 'June',
             'July', 'August', 'September', 'October', 'November', 'December'
           ];
-          
+
           return (
             <section className="attendance-section">
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
                 marginBottom: '1.5rem',
                 flexWrap: 'wrap',
@@ -1646,7 +1658,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
               }}>
                 <SectionHeader icon="🗓️" title={`Attendance — ${monthName} ${year}`} />
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                  <select 
+                  <select
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
                     style={{
@@ -1663,7 +1675,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                       <option key={idx} value={idx}>{month}</option>
                     ))}
                   </select>
-                  <select 
+                  <select
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(parseInt(e.target.value))}
                     style={{
@@ -1700,10 +1712,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                           const status = holidayDates.has(dateStr)
                             ? 'holiday'
                             : presentDates.has(dateStr)
-                            ? 'present'
-                            : absentDates.has(dateStr)
-                            ? 'absent'
-                            : '';
+                              ? 'present'
+                              : absentDates.has(dateStr)
+                                ? 'absent'
+                                : '';
                           return (
                             <td key={`${wi}-${di}`} className={status}>
                               <span className="cal-date">{date.getDate()}</span>
@@ -1720,11 +1732,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                   <span className="legend-item holiday">Holiday</span>
                 </div>
               </div>
-              
+
               {/* Attendance Summary Cards */}
-              <div className="attendance-stats" style={{ 
-                display: 'flex', 
-                gap: '1rem', 
+              <div className="attendance-stats" style={{
+                display: 'flex',
+                gap: '1rem',
                 marginTop: '1.5rem',
                 flexWrap: 'wrap'
               }}>
@@ -1741,7 +1753,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                   <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{attendance.present}</div>
                   <div style={{ fontSize: '0.9rem', marginTop: '0.25rem', opacity: 0.9 }}>Days Present</div>
                 </div>
-                
+
                 <div className="attendance-stat-card" style={{
                   flex: '1',
                   minWidth: '150px',
@@ -1755,7 +1767,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                   <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{attendance.absent}</div>
                   <div style={{ fontSize: '0.9rem', marginTop: '0.25rem', opacity: 0.9 }}>Days Absent</div>
                 </div>
-                
+
                 <div className="attendance-stat-card" style={{
                   flex: '1',
                   minWidth: '150px',
@@ -1769,7 +1781,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                   <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{attendancePercent}%</div>
                   <div style={{ fontSize: '0.9rem', marginTop: '0.25rem', opacity: 0.9 }}>Attendance Rate</div>
                 </div>
-                
+
                 <div className="attendance-stat-card" style={{
                   flex: '1',
                   minWidth: '150px',
@@ -1799,8 +1811,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Holiday calendar will be updated by administration.</p>
               </div>
             ) : (
-              <div style={{ 
-                display: 'grid', 
+              <div style={{
+                display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                 gap: '1.5rem',
                 marginTop: '1rem'
@@ -1812,7 +1824,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                     const endDate = new Date(h.endDate || h.date);
                     const isSingleDay = startDate.getTime() === endDate.getTime();
                     const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-                    
+
                     return (
                       <div key={h.id} style={{
                         padding: '1.5rem',
@@ -1823,10 +1835,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                         transition: 'transform 0.2s',
                         cursor: 'pointer'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
-                      onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                        onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
+                        onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                       >
-                        <div style={{ 
+                        <div style={{
                           fontSize: isSingleDay ? '2.5rem' : '1.5rem',
                           marginBottom: '0.5rem',
                           textAlign: 'center',
@@ -1836,32 +1848,20 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                             startDate.getDate()
                           ) : (
                             <div>
-                              <div>{startDate.getDate()} - {endDate.getDate()}</div>
+                              <div>{startDate.getDate()} {startDate.toLocaleDateString('en-US', {month: 'long', year: 'numeric'})} - {endDate.getDate()} {endDate.toLocaleDateString('en-US', {month: 'long', year: 'numeric'})}</div>
                               <div style={{ fontSize: '0.7em', opacity: 0.9, marginTop: '0.25rem' }}>
                                 ({daysDiff + 1} days)
                               </div>
                             </div>
                           )}
                         </div>
-                        <div style={{ 
-                          fontSize: '0.9rem',
-                          textAlign: 'center',
-                          opacity: 0.9,
-                          marginBottom: '0.75rem'
-                        }}>
-                          {startDate.toLocaleDateString('en-US', { 
-                            month: 'long', 
-                            year: 'numeric' 
-                          })}
-                        </div>
-                        <div style={{ 
-                          fontSize: '1.1rem',
-                          fontWeight: '600',
-                          textAlign: 'center'
-                        }}>
+                        {/* <div style={{fontSize: '0.9rem', textAlign: 'center', opacity: 0.9, marginBottom: '0.75rem'}}>
+                          {startDate.toLocaleDateString('en-US', {month: 'long', year: 'numeric'})}
+                        </div> */}
+                        <div style={{fontSize: '1.1rem', fontWeight: '600', textAlign: 'center'}}>
                           {h.name}
                         </div>
-                        <div style={{ 
+                        <div style={{
                           fontSize: '0.85rem',
                           textAlign: 'center',
                           marginTop: '0.5rem',
@@ -1916,7 +1916,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         {activeTab === 'results' && (
           <section className="results-section">
             <SectionHeader icon="📊" title="Academic Results" />
-            
+
             {/* Loading State */}
             {resultsLoading && (
               <div style={{
@@ -1942,7 +1942,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 <p style={{ color: '#dc3545', marginBottom: '1.5rem' }}>
                   {resultsError}
                 </p>
-                <button 
+                <button
                   className="download-btn"
                   onClick={async () => {
                     setResultsLoading(true);
@@ -1980,16 +1980,51 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                   marginBottom: '1.5rem',
                   boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
                 }}>
-                  <h3 style={{ margin: '0 0 0.5rem 0' }}>
-                    {studentResults.studentName}
-                  </h3>
-                  <p style={{ margin: '0', opacity: 0.9 }}>
-                    {studentResults.className} - Section {studentResults.section}
-                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 0.5rem 0' }}>
+                        {studentResults.studentName}
+                      </h3>
+                      <p style={{ margin: '0', opacity: 0.9 }}>
+                        Current Class: {studentResults.className}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowMarksheetView(!showMarksheetView)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        border: '2px solid white',
+                        padding: '0.6rem 1.2rem',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'white';
+                        e.currentTarget.style.color = '#667eea';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                        e.currentTarget.style.color = 'white';
+                      }}
+                    >
+                      {showMarksheetView ? '📋 Show Exam View' : '📊 Show Marksheet Table'}
+                    </button>
+                  </div>
                 </div>
 
-                {/* Exam Results */}
-                {studentResults.examResults && studentResults.examResults.length > 0 ? (
+                {/* Marksheet Table View */}
+                {showMarksheetView ? (
+                  <MarksheetTable
+                    studentResults={studentResults}
+                    onDownload={() => ResultPDFGenerator.generateMarksheetPDF(studentResults, 'School Learning Management System')}
+                  />
+                ) : (
+                  <>
+                    {/* Exam Results */}
+                    {studentResults.examResults && studentResults.examResults.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                     {studentResults.examResults.map((examResult, index) => (
                       <div key={index} className="result-card" style={{
@@ -2022,9 +2057,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                             <div style={{
                               fontSize: '2rem',
                               fontWeight: '700',
-                              color: examResult.percentage >= 90 ? '#10b981' : 
-                                     examResult.percentage >= 75 ? '#3b82f6' :
-                                     examResult.percentage >= 60 ? '#f59e0b' : '#ef4444'
+                              color: examResult.percentage >= 90 ? '#10b981' :
+                                examResult.percentage >= 75 ? '#3b82f6' :
+                                  examResult.percentage >= 60 ? '#f59e0b' : '#ef4444'
                             }}>
                               {examResult.percentage.toFixed(1)}%
                             </div>
@@ -2032,11 +2067,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                               padding: '0.25rem 0.75rem',
                               borderRadius: '12px',
                               backgroundColor: examResult.overallGrade === 'A+' || examResult.overallGrade === 'A' ? '#d1fae5' :
-                                             examResult.overallGrade === 'B+' || examResult.overallGrade === 'B' ? '#dbeafe' :
-                                             examResult.overallGrade === 'C' ? '#fef3c7' : '#fee2e2',
+                                examResult.overallGrade === 'B+' || examResult.overallGrade === 'B' ? '#dbeafe' :
+                                  examResult.overallGrade === 'C' ? '#fef3c7' : '#fee2e2',
                               color: examResult.overallGrade === 'A+' || examResult.overallGrade === 'A' ? '#065f46' :
-                                     examResult.overallGrade === 'B+' || examResult.overallGrade === 'B' ? '#1e40af' :
-                                     examResult.overallGrade === 'C' ? '#92400e' : '#991b1b',
+                                examResult.overallGrade === 'B+' || examResult.overallGrade === 'B' ? '#1e40af' :
+                                  examResult.overallGrade === 'C' ? '#92400e' : '#991b1b',
                               fontSize: '0.9rem',
                               fontWeight: '600',
                               marginTop: '0.5rem'
@@ -2062,7 +2097,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                           </thead>
                           <tbody>
                             {examResult.subjectScores && examResult.subjectScores.map((subjectScore, subIndex) => (
-                              <tr key={subIndex} style={{ 
+                              <tr key={subIndex} style={{
                                 backgroundColor: subIndex % 2 === 0 ? 'white' : '#f9fafb',
                                 borderBottom: '1px solid #e5e7eb'
                               }}>
@@ -2086,11 +2121,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                                       padding: '0.25rem 0.5rem',
                                       borderRadius: '6px',
                                       backgroundColor: subjectScore.grade === 'A+' || subjectScore.grade === 'A' ? '#d1fae5' :
-                                                     subjectScore.grade === 'B+' || subjectScore.grade === 'B' ? '#dbeafe' :
-                                                     subjectScore.grade === 'C' ? '#fef3c7' : '#fee2e2',
+                                        subjectScore.grade === 'B+' || subjectScore.grade === 'B' ? '#dbeafe' :
+                                          subjectScore.grade === 'C' ? '#fef3c7' : '#fee2e2',
                                       color: subjectScore.grade === 'A+' || subjectScore.grade === 'A' ? '#065f46' :
-                                             subjectScore.grade === 'B+' || subjectScore.grade === 'B' ? '#1e40af' :
-                                             subjectScore.grade === 'C' ? '#92400e' : '#991b1b',
+                                        subjectScore.grade === 'B+' || subjectScore.grade === 'B' ? '#1e40af' :
+                                          subjectScore.grade === 'C' ? '#92400e' : '#991b1b',
                                       fontWeight: '600',
                                       fontSize: '0.85rem'
                                     }}>
@@ -2152,7 +2187,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
                         {/* Download Button */}
                         <div style={{ marginTop: '1rem', textAlign: 'right' }}>
-                          <button 
+                          <button
                             className="download-btn"
                             onClick={() => {
                               try {
@@ -2210,7 +2245,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                             Average Percentage
                           </div>
                           <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3b82f6' }}>
-                            {(studentResults.examResults.reduce((sum, exam) => sum + exam.percentage, 0) / 
+                            {(studentResults.examResults.reduce((sum, exam) => sum + exam.percentage, 0) /
                               studentResults.examResults.length).toFixed(2)}%
                           </div>
                         </div>
@@ -2239,6 +2274,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                     </p>
                   </div>
                 )}
+                  </>
+                )}
               </div>
             )}
           </section>
@@ -2247,7 +2284,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         {activeTab === 'fees' && (
           <section className="fees-section">
             <SectionHeader icon="💳" title="Fees and Status" />
-            
+
             {!feeData ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
                 <p>No fee information available at the moment.</p>
@@ -2259,7 +2296,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                   <p><strong>Amount Paid:</strong> ₹{feeStatus.paid.toLocaleString('en-IN')}</p>
                   <p><strong>Amount Pending:</strong> ₹{feeStatus.pending.toLocaleString('en-IN')}</p>
                   <p><strong>Overdue Amount:</strong> ₹{(feeData.totalOverdue || 0).toLocaleString('en-IN')}</p>
-                  <p><strong>Payment Status:</strong> <span style={{ 
+                  <p><strong>Payment Status:</strong> <span style={{
                     color: feeStatus.status === 'paid' ? 'green' : feeStatus.status === 'overdue' ? 'red' : 'orange',
                     fontWeight: 'bold',
                     textTransform: 'capitalize'
@@ -2288,7 +2325,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                             <td>₹{(fee.amount || 0).toLocaleString('en-IN')}</td>
                             <td>{fee.dueDate || 'N/A'}</td>
                             <td>
-                              <span style={{ 
+                              <span style={{
                                 color: fee.status === 'PAID' ? 'green' : fee.status === 'OVERDUE' ? 'red' : 'orange',
                                 fontWeight: 'bold'
                               }}>
@@ -2312,11 +2349,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
             <SectionHeader icon="🖼️" title="Gallery" />
             <div className="gallery-container">
               {gallery.length === 0 ? (
-                <div style={{ 
-                  textAlign: 'center', 
-                  padding: '40px', 
+                <div style={{
+                  textAlign: 'center',
+                  padding: '40px',
                   color: '#666',
-                  fontSize: '16px' 
+                  fontSize: '16px'
                 }}>
                   <p>📷 No images available in gallery yet.</p>
                   <p style={{ fontSize: '14px', marginTop: '10px' }}>Images will appear here once uploaded by admin.</p>
@@ -2341,19 +2378,19 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                             const [datePart] = dateStr.split(' ');
 
                             return `Uploaded On : ${datePart}`
-                            
+
                             // if (!datePart) return 'Uploaded: Date unavailable';
-                            
+
                             // // Parse date
                             // const date = new Date(datePart);
                             // if (isNaN(date.getTime())) return 'Uploaded: Date unavailable';
-                            
+
                             // const formattedDate = date.toLocaleDateString('en-US', { 
                             //   year: 'numeric', 
                             //   month: 'short', 
                             //   day: 'numeric' 
                             // });
-                            
+
                             // // Parse time if available
                             // if (timePart) {
                             //   const timeOnly = timePart.split('.')[0]; // Remove microseconds
@@ -2362,10 +2399,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                             //   const minute = minutes;
                             //   const ampm = hour >= 12 ? 'PM' : 'AM';
                             //   const displayHour = hour % 12 || 12;
-                              
+
                             //   return `Uploaded: ${formattedDate} at ${displayHour}:${minute} ${ampm}`;
                             // }
-                            
+
                             // return `Uploaded: ${formattedDate}`;
                           } catch (e) {
                             return 'Uploaded: Date unavailable';
@@ -2397,8 +2434,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
             <form className="query-form" onSubmit={handleSubmitQuery}>
               <div className="form-group">
                 <label>Select Teacher & Subject</label>
-                <select 
-                  value={selectedQueryTeacher || ''} 
+                <select
+                  value={selectedQueryTeacher || ''}
                   onChange={(e) => {
                     const selected = enquiryContacts.find(c => c.id === e.target.value);
                     setSelectedQueryTeacher(selected ? Number(selected.id) : null);
@@ -2474,7 +2511,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
             <div className="query-form">
               <div className="form-group">
                 <label>Reason</label>
-                <input 
+                <input
                   type="text"
                   placeholder="Reason (e.g., Medical, Family)"
                   value={leaveSubject}
@@ -2483,7 +2520,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
               </div>
               <div className="form-group">
                 <label>Start Date</label>
-                <input 
+                <input
                   type="date"
                   value={leaveStartDate}
                   onChange={(e) => setLeaveStartDate(e.target.value)}
@@ -2491,7 +2528,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
               </div>
               <div className="form-group">
                 <label>End Date</label>
-                <input 
+                <input
                   type="date"
                   value={leaveEndDate}
                   onChange={(e) => setLeaveEndDate(e.target.value)}
@@ -2505,7 +2542,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                     cloudName: 'dnmwonmud',
                     uploadPreset: 'ml_default',
                     multiple: false,
-                    folder: 'slms-leave-proofs',
+                    folder: 'slms',
                     cropping: false,
                     showAdvancedOptions: false,
                     sources: ['local', 'camera'],
@@ -2530,16 +2567,16 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 />
                 {leaveProofImageUrl && (
                   <div style={{ marginTop: '0.75rem' }}>
-                    <img 
-                      src={leaveProofImageUrl} 
-                      alt="Leave Proof" 
-                      style={{ 
-                        maxWidth: '200px', 
-                        maxHeight: '200px', 
-                        objectFit: 'cover', 
+                    <img
+                      src={leaveProofImageUrl}
+                      alt="Leave Proof"
+                      style={{
+                        maxWidth: '200px',
+                        maxHeight: '200px',
+                        objectFit: 'cover',
                         borderRadius: '8px',
                         border: '2px solid #10b981'
-                      }} 
+                      }}
                     />
                     <p style={{ color: '#10b981', fontSize: '0.9rem', marginTop: '0.5rem' }}>
                       ✓ Proof image uploaded
@@ -2547,8 +2584,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                   </div>
                 )}
               </div>
-              <button 
-                className="tc-btn" 
+              <button
+                className="tc-btn"
                 onClick={handleSubmitLeave}
                 type="button"
                 disabled={!leaveSubject || !leaveStartDate || !leaveEndDate}
@@ -2597,7 +2634,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                       {leave.processedAt && (
                         <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>
                           Processed on: {formatDateTime(leave.processedAt)}
-                        </p>  
+                        </p>
                       )}
                     </div>
                   ))}
@@ -2610,7 +2647,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         {activeTab === 'tc' && (
           <section className="transfer-section">
             <SectionHeader icon="📋" title="Transfer Certificate" />
-            
+
             {/* Success/Error Messages */}
             {tcSuccess && (
               <div style={{
@@ -2624,7 +2661,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 {tcSuccess}
               </div>
             )}
-            
+
             {tcError && (
               <div style={{
                 padding: '12px 16px',
@@ -2647,11 +2684,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
               </ul>
               {/* Check if there's already a pending or processing request */}
               {(() => {
-                const hasPendingRequest = tcRequests.some(req => 
-                  req.status === 'PENDING' || 
+                const hasPendingRequest = tcRequests.some(req =>
+                  req.status === 'PENDING' ||
                   req.status === 'FORWARDED_TO_TEACHER'
                 );
-                
+
                 return hasPendingRequest ? (
                   <div style={{
                     padding: '12px 16px',
@@ -2664,8 +2701,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                     ⏳ You already have a pending transfer certificate request. Please wait for it to be processed.
                   </div>
                 ) : (
-                  <button 
-                    className="tc-btn" 
+                  <button
+                    className="tc-btn"
                     onClick={() => setShowTCForm(true)}
                     disabled={tcLoading}
                   >
@@ -2680,11 +2717,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
               <div className="tc-modal-overlay">
                 <div className="tc-modal-content">
                   <h2 className="tc-modal-title">📋 Transfer Certificate Request</h2>
-                  
+
                   {tcError && (
                     <div className="tc-error-message">{tcError}</div>
                   )}
-                  
+
                   <form onSubmit={(e) => {
                     e.preventDefault();
                     handleSubmitTCRequest();
@@ -2838,7 +2875,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         {activeTab === 'history' && (
           <section className="previous-schools-section">
             <SectionHeader icon="📚" title="Previous Schooling Records" />
-            
+
             {/* Loading State */}
             {previousSchoolingLoading && (
               <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
@@ -2872,195 +2909,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
               </div>
             )}
 
-            {/* Records Display */}
+            {/* Records Display - Using Table Component */}
             {!previousSchoolingLoading && previousSchoolingRecords.length > 0 && (
-              <div className="school-records" style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-                gap: '1.5rem',
-                marginTop: '1.5rem'
-              }}>
-                {previousSchoolingRecords.map((record, index) => (
-                  <div key={index} className="school-card" style={{
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '12px',
-                    padding: '1.5rem',
-                    backgroundColor: 'white',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                    transition: 'transform 0.2s, box-shadow 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-4px)';
-                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
-                  }}>
-                    {/* Header */}
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '1rem',
-                      paddingBottom: '1rem',
-                      borderBottom: '2px solid #f3f4f6'
-                    }}>
-                      <h3 style={{ margin: 0, fontSize: '1.5rem', color: '#1f2937' }}>
-                        Class {record.className}-{record.section}
-                      </h3>
-                      <span style={{
-                        padding: '0.25rem 0.75rem',
-                        borderRadius: '12px',
-                        fontSize: '0.85rem',
-                        fontWeight: '600',
-                        backgroundColor: record.status === 'COMPLETED' ? '#d1fae5' :
-                                       record.status === 'TRANSFERRED' ? '#fef3c7' : '#dbeafe',
-                        color: record.status === 'COMPLETED' ? '#065f46' :
-                               record.status === 'TRANSFERRED' ? '#92400e' : '#1e40af'
-                      }}>
-                        {record.status}
-                      </span>
-                    </div>
-
-                    {/* Session Info */}
-                    <div style={{ marginBottom: '1rem' }}>
-                      <p style={{ margin: '0.5rem 0', color: '#4b5563' }}>
-                        <strong>Session:</strong> {record.sessionName}
-                      </p>
-                      <p style={{ margin: '0.5rem 0', color: '#4b5563' }}>
-                        <strong>Passing Year:</strong> {record.passingYear}
-                      </p>
-                    </div>
-
-                    {/* Overall Performance */}
-                    <div style={{
-                      backgroundColor: '#f9fafb',
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      marginBottom: '1rem'
-                    }}>
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: '1rem'
-                      }}>
-                        <div>
-                          <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>
-                            Overall Percentage
-                          </div>
-                          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3b82f6' }}>
-                            {record.overallPercentage.toFixed(1)}%
-                          </div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>
-                            Overall Grade
-                          </div>
-                          <div style={{
-                            fontSize: '1.5rem',
-                            fontWeight: '700',
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '8px',
-                            display: 'inline-block',
-                            backgroundColor: record.overallGrade === 'A+' || record.overallGrade === 'A' ? '#d1fae5' :
-                                           record.overallGrade === 'B+' || record.overallGrade === 'B' ? '#dbeafe' :
-                                           record.overallGrade === 'C' ? '#fef3c7' : '#fee2e2',
-                            color: record.overallGrade === 'A+' || record.overallGrade === 'A' ? '#065f46' :
-                                   record.overallGrade === 'B+' || record.overallGrade === 'B' ? '#1e40af' :
-                                   record.overallGrade === 'C' ? '#92400e' : '#991b1b'
-                          }}>
-                            {record.overallGrade}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Attendance */}
-                    <div style={{
-                      backgroundColor: '#f0fdf4',
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      marginBottom: '1rem'
-                    }}>
-                      <div style={{ fontSize: '0.9rem', fontWeight: '600', color: '#065f46', marginBottom: '0.5rem' }}>
-                        📊 Attendance Summary
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#059669' }}>
-                        <span>Present: {record.totalPresent} days</span>
-                        <span>Absent: {record.totalAbsent} days</span>
-                      </div>
-                      <div style={{
-                        marginTop: '0.5rem',
-                        fontSize: '1.1rem',
-                        fontWeight: '600',
-                        color: '#065f46',
-                        textAlign: 'center'
-                      }}>
-                        {record.attendancePercentage.toFixed(1)}% Attendance
-                      </div>
-                    </div>
-
-                    {/* Exam Results */}
-                    {record.examResults && record.examResults.length > 0 && (
-                      <div style={{ marginTop: '1rem' }}>
-                        <div style={{
-                          fontSize: '0.9rem',
-                          fontWeight: '600',
-                          color: '#1f2937',
-                          marginBottom: '0.75rem'
-                        }}>
-                          📝 Exam Performance
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          {record.examResults.map((exam, examIndex) => (
-                            <div key={examIndex} style={{
-                              padding: '0.75rem',
-                              backgroundColor: '#f9fafb',
-                              borderRadius: '6px',
-                              border: '1px solid #e5e7eb'
-                            }}>
-                              <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center'
-                              }}>
-                                <div>
-                                  <div style={{ fontWeight: '600', fontSize: '0.9rem', color: '#1f2937' }}>
-                                    {exam.examName}
-                                  </div>
-                                  <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                                    {exam.obtainedMarks}/{exam.totalMarks} marks
-                                  </div>
-                                </div>
-                                <div style={{ textAlign: 'right' }}>
-                                  <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#3b82f6' }}>
-                                    {exam.percentage.toFixed(1)}%
-                                  </div>
-                                  <span style={{
-                                    padding: '0.2rem 0.5rem',
-                                    borderRadius: '6px',
-                                    fontSize: '0.75rem',
-                                    fontWeight: '600',
-                                    backgroundColor: exam.grade === 'A+' || exam.grade === 'A' ? '#d1fae5' :
-                                                   exam.grade === 'B+' || exam.grade === 'B' ? '#dbeafe' :
-                                                   exam.grade === 'C' ? '#fef3c7' : '#fee2e2',
-                                    color: exam.grade === 'A+' || exam.grade === 'A' ? '#065f46' :
-                                           exam.grade === 'B+' || exam.grade === 'B' ? '#1e40af' :
-                                           exam.grade === 'C' ? '#92400e' : '#991b1b'
-                                  }}>
-                                    {exam.grade}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <PreviousSchoolingTable records={previousSchoolingRecords} />
             )}
           </section>
         )}

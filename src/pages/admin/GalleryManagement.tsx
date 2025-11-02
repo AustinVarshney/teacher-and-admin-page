@@ -429,7 +429,7 @@ const GalleryManagement = () => {
           </button>
         </div>
 
-        <div className="control-group">
+        {/* <div className="control-group">
           <button
             onClick={() => {
               console.log('=== DEBUG INFO ===');
@@ -445,7 +445,7 @@ const GalleryManagement = () => {
           >
             🐛 Debug Session State
           </button>
-        </div>
+        </div> */}
       </div>
 
       {loading && (

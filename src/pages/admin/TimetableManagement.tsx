@@ -420,7 +420,7 @@ const TimetableManagement: React.FC = () => {
           <option value="">-- Choose a Class --</option>
           {classes.map(cls => (
             <option key={cls.id} value={cls.id}>
-              {cls.className} - Section {cls.section}
+              {cls.className}
             </option>
           ))}
         </select>

@@ -245,11 +245,11 @@ const HolidayManagement: React.FC = () => {
                           {isDateRange ? (
                             <>
                               <div className="date-day" style={{ fontSize: '0.95rem', lineHeight: '1.2' }}>
-                                {new Date(holidayDate).getDate()} - {new Date(holidayEndDate).getDate()}
+                                {new Date(holidayDate).getDate()} {new Date(holidayDate).toLocaleDateString('en-US', { month: 'short' })} - {new Date(holidayEndDate).getDate()} {new Date(holidayEndDate).toLocaleDateString('en-US', { month: 'short' })}
                               </div>
-                              <div className="date-month" style={{ fontSize: '0.75rem' }}>
+                              {/* <div className="date-month" style={{ fontSize: '0.75rem' }}>
                                 {new Date(holidayDate).toLocaleDateString('en-US', { month: 'short' })}
-                              </div>
+                              </div> */}
                               <div style={{ 
                                 fontSize: '0.65rem', 
                                 marginTop: '6px', 

@@ -372,6 +372,247 @@ export class ResultPDFGenerator {
     if (percentage >= 40) return 'D';
     return 'F';
   }
+
+  /**
+   * Generate comprehensive marksheet PDF with subjects as rows and exams as columns
+   */
+  static generateMarksheetPDF(
+    studentResults: StudentResultsDTO,
+    schoolName: string = 'School Learning Management System'
+  ): void {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let yPos = 20;
+
+    // Transform exam-centric data to subject-centric data
+    const subjectMap = new Map<string, {
+      subjectName: string;
+      examMarks: { [examName: string]: { marks: number; maxMarks: number } };
+      totalObtained: number;
+      totalMax: number;
+      percentage: number;
+    }>();
+
+    const exams = studentResults.examResults || [];
+
+    // Build subject-wise data
+    exams.forEach((exam) => {
+      exam.subjectScores?.forEach((score) => {
+        if (!subjectMap.has(score.subjectName)) {
+          subjectMap.set(score.subjectName, {
+            subjectName: score.subjectName,
+            examMarks: {},
+            totalObtained: 0,
+            totalMax: 0,
+            percentage: 0
+          });
+        }
+
+        const subject = subjectMap.get(score.subjectName)!;
+        subject.examMarks[exam.examName] = {
+          marks: score.marks,
+          maxMarks: score.maxMarks
+        };
+        subject.totalObtained += score.marks || 0;
+        subject.totalMax += score.maxMarks || 0;
+      });
+    });
+
+    // Calculate percentages
+    subjectMap.forEach((subject) => {
+      if (subject.totalMax > 0) {
+        subject.percentage = (subject.totalObtained / subject.totalMax) * 100;
+      }
+    });
+
+    const subjects = Array.from(subjectMap.values());
+    const examNames = exams.map(e => e.examName);
+
+    // Header - School Name
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(schoolName, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
+
+    // Marksheet Title
+    doc.setFontSize(14);
+    doc.text('COMPREHENSIVE MARKSHEET', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 12;
+
+    // Add a line separator
+    doc.setLineWidth(0.5);
+    doc.line(15, yPos, pageWidth - 15, yPos);
+    yPos += 8;
+
+    // Student Information
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    const studentInfoLeft = 15;
+    const studentInfoMiddle = pageWidth / 3 + 10;
+    const studentInfoRight = (pageWidth * 2) / 3 + 10;
+
+    // Name
+    doc.text('Student Name:', studentInfoLeft, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(studentResults.studentName, studentInfoLeft + 35, yPos);
+
+    // Class
+    doc.setFont('helvetica', 'bold');
+    doc.text('Class:', studentInfoMiddle, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${studentResults.className} - Section ${studentResults.section}`, studentInfoMiddle + 15, yPos);
+
+    // PAN
+    doc.setFont('helvetica', 'bold');
+    doc.text('PAN:', studentInfoRight, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(studentResults.studentPanNumber, studentInfoRight + 15, yPos);
+    yPos += 10;
+
+    // Another separator
+    doc.setLineWidth(0.3);
+    doc.line(15, yPos, pageWidth - 15, yPos);
+    yPos += 8;
+
+    // Build table headers
+    // We'll create a proper 2-row header structure
+    // First row: Subject | Exam1 | Exam2 | ... | Total | %
+    // Second row: empty | Obt. Max | Obt. Max | ... | Obt. Max | empty
+    
+    const firstHeaderRow: string[] = ['Subject'];
+    const secondHeaderRow: string[] = [''];
+
+    examNames.forEach(examName => {
+      firstHeaderRow.push(examName);
+      secondHeaderRow.push('Obt.');
+      secondHeaderRow.push('Max');
+    });
+
+    firstHeaderRow.push('Total');
+    secondHeaderRow.push('Obt.');
+    secondHeaderRow.push('Max');
+
+    firstHeaderRow.push('%');
+    secondHeaderRow.push('');
+
+    // Build table body
+    const tableData: string[][] = [];
+
+    subjects.forEach(subject => {
+      const row: string[] = [subject.subjectName];
+
+      examNames.forEach(examName => {
+        const examMarks = subject.examMarks[examName];
+        row.push(examMarks ? (examMarks.marks !== null && examMarks.marks !== undefined ? examMarks.marks.toString() : '-') : '-');
+        row.push(examMarks ? examMarks.maxMarks.toString() : '-');
+      });
+
+      row.push(subject.totalObtained.toString());
+      row.push(subject.totalMax.toString());
+      row.push(subject.percentage.toFixed(1) + '%');
+
+      tableData.push(row);
+    });
+
+    // Calculate overall totals row
+    const overallTotals: { [examName: string]: { obtained: number; max: number } } = {};
+    subjects.forEach((subject) => {
+      Object.entries(subject.examMarks).forEach(([examName, marks]) => {
+        if (!overallTotals[examName]) {
+          overallTotals[examName] = { obtained: 0, max: 0 };
+        }
+        overallTotals[examName].obtained += marks.marks || 0;
+        overallTotals[examName].max += marks.maxMarks || 0;
+      });
+    });
+
+    let grandTotalObtained = 0;
+    let grandTotalMax = 0;
+    Object.values(overallTotals).forEach((total) => {
+      grandTotalObtained += total.obtained;
+      grandTotalMax += total.max;
+    });
+    const grandPercentage = grandTotalMax > 0 ? (grandTotalObtained / grandTotalMax) * 100 : 0;
+
+    const totalRow: string[] = ['OVERALL TOTAL'];
+    examNames.forEach(examName => {
+      const total = overallTotals[examName];
+      totalRow.push(total ? total.obtained.toString() : '0');
+      totalRow.push(total ? total.max.toString() : '0');
+    });
+    totalRow.push(grandTotalObtained.toString());
+    totalRow.push(grandTotalMax.toString());
+    totalRow.push(grandPercentage.toFixed(1) + '%');
+
+    tableData.push(totalRow);
+
+    // Generate table with autoTable
+    autoTable(doc, {
+      head: [firstHeaderRow, secondHeaderRow],
+      body: tableData,
+      startY: yPos,
+      theme: 'grid',
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+        halign: 'center',
+        valign: 'middle'
+      },
+      headStyles: {
+        fillColor: [102, 126, 234],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        halign: 'center'
+      },
+      columnStyles: {
+        0: { halign: 'left', fontStyle: 'bold', cellWidth: 40 } // Subject column
+      },
+      footStyles: {
+        fillColor: [230, 230, 230],
+        textColor: [0, 0, 0],
+        fontStyle: 'bold'
+      },
+      didParseCell: function(data) {
+        // Highlight the last row (Overall Total)
+        if (data.row.index === tableData.length - 1) {
+          data.cell.styles.fillColor = [230, 230, 230];
+          data.cell.styles.fontStyle = 'bold';
+        }
+        // Highlight Total and Percentage columns
+        if (data.column.index >= firstHeaderRow.length - 3) {
+          data.cell.styles.fillColor = data.row.index === tableData.length - 1 
+            ? [200, 230, 201] 
+            : [232, 245, 233];
+        }
+      }
+    });
+
+    // Footer
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    doc.text(
+      `Generated on: ${new Date().toLocaleString()}`,
+      pageWidth / 2,
+      finalY,
+      { align: 'center' }
+    );
+
+    // Grade Legend
+    const legendY = finalY + 6;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(
+      'Grade Scale: A+ (90-100) | A (80-89) | B+ (70-79) | B (60-69) | C (50-59) | D (40-49) | F (<40)',
+      pageWidth / 2,
+      legendY,
+      { align: 'center' }
+    );
+
+    // Save the PDF
+    const fileName = `Marksheet_${studentResults.studentName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+  }
 }
 
 export default ResultPDFGenerator;

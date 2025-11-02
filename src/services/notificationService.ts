@@ -7,6 +7,8 @@ export interface NotificationDto {
   recipientId: string;
   recipientType: 'STUDENT' | 'TEACHER' | 'STAFF' | 'ADMIN';
   senderName?: string;
+  senderId?: string;
+  broadcastId?: string;
   isRead?: boolean;
   priority?: 'LOW' | 'MEDIUM' | 'HIGH';
   createdAt?: string;
@@ -123,6 +125,51 @@ export class NotificationService {
       throw new Error(response.data.message || 'Failed to delete notification');
     } catch (error: any) {
       const message = error.response?.data?.message || error.message || 'Failed to delete notification';
+      throw new Error(message);
+    }
+  }
+
+  // Get all sent messages by current admin
+  static async getSentMessages(): Promise<NotificationDto[]> {
+    try {
+      const response = await api.get('/notifications/sent');
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to fetch sent messages');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch sent messages';
+      throw new Error(message);
+    }
+  }
+
+  // Update a broadcast message (Admin only)
+  static async updateBroadcast(broadcastId: string, updateData: BroadcastMessageDto): Promise<NotificationDto> {
+    try {
+      const response = await api.put(`/notifications/broadcast/${broadcastId}`, updateData);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to update broadcast message');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to update broadcast message';
+      throw new Error(message);
+    }
+  }
+
+  // Get all notifications in a broadcast
+  static async getBroadcastMessages(broadcastId: string): Promise<NotificationDto[]> {
+    try {
+      const response = await api.get(`/notifications/broadcast/${broadcastId}`);
+      
+      if (response.status >= 200 && response.status < 300) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to fetch broadcast messages');
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch broadcast messages';
       throw new Error(message);
     }
   }

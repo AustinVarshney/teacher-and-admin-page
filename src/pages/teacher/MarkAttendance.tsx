@@ -37,16 +37,46 @@ const MarkAttendance: React.FC<MarkAttendanceProps> = ({ classId, className, sec
       console.log('Fetching students for class ID:', classId);
       const studentsData = await TeacherService.getStudentsByClass(parseInt(classId));
       
-      const transformedStudents: Student[] = studentsData.map((s: any) => ({
-        panNumber: s.panNumber || s.id,
-        name: s.name || 'Unknown',
-        rollNumber: s.classRollNumber || 0,
-        isPresent: true // Default to present
-      })).sort((a: Student, b: Student) => a.rollNumber - b.rollNumber);
+      // Try to fetch existing attendance for today's date
+      let existingAttendance: any = null;
+      try {
+        existingAttendance = await AttendanceService.getAttendanceByClassAndDate(classId, date);
+        console.log('Existing attendance found:', existingAttendance);
+      } catch (attendanceError) {
+        console.log('No existing attendance for today:', attendanceError);
+        // No attendance marked yet for today, which is fine
+      }
+      
+      // Create a map of existing attendance by panNumber for quick lookup
+      const attendanceMap = new Map<string, boolean>();
+      if (existingAttendance && existingAttendance.studentAttendances) {
+        existingAttendance.studentAttendances.forEach((att: any) => {
+          attendanceMap.set(att.panNumber, att.isPresent);
+        });
+      }
+      
+      const transformedStudents: Student[] = studentsData.map((s: any) => {
+        const panNumber = s.panNumber || s.id;
+        // Use existing attendance status if available, otherwise default to true
+        const isPresent = attendanceMap.has(panNumber) 
+          ? attendanceMap.get(panNumber)! 
+          : true;
+        
+        return {
+          panNumber,
+          name: s.name || 'Unknown',
+          rollNumber: s.classRollNumber || 0,
+          isPresent
+        };
+      }).sort((a: Student, b: Student) => a.rollNumber - b.rollNumber);
 
       setStudents(transformedStudents);
-      setSelectAll(true);
-      console.log('Loaded students:', transformedStudents);
+      
+      // Set selectAll based on whether all students are present
+      const allPresent = transformedStudents.every(s => s.isPresent);
+      setSelectAll(allPresent);
+      
+      console.log('Loaded students with attendance:', transformedStudents);
     } catch (err: any) {
       console.error('Error fetching students:', err);
       setError(err.message || 'Failed to load students');

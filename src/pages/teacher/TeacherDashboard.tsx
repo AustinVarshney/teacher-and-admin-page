@@ -1673,7 +1673,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                   </div>
                 )}
 
-                {((query.status === 'OPEN' && !query.response) || (query.response && responseText[query.teacherId!])) && query.status !== 'CLOSED' && (
+                {((query.status === 'OPEN' && !query.response) || (query.response && responseText[query.id])) && query.status !== 'CLOSED' && (
                   <div style={{
                     backgroundColor: '#f8fafc',
                     padding: '1.5rem',
@@ -1687,14 +1687,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                       color: '#1f2937',
                       fontSize: '0.95rem'
                     }}>
-                      💬 {query.response && responseText[query.teacherId!] ? 'Edit Your Response:' : 'Your Response:'}
+                      💬 {query.response && responseText[query.id] ? 'Edit Your Response:' : 'Your Response:'}
                     </label>
                     <textarea
-                      value={responseText[query.teacherId!] || ''}
+                      value={responseText[query.id] || ''}
                       onChange={(e) => {
-                        if (query.teacherId) {
-                          setResponseText({ ...responseText, [query.teacherId]: e.target.value });
-                        }
+                        setResponseText({ ...responseText, [query.id]: e.target.value });
                       }}
                       placeholder="Type your response to the student..."
                       rows={4}
@@ -1720,42 +1718,40 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                     <div style={{ display: 'flex', gap: '0.75rem' }}>
                       <button 
                         onClick={() => {
-                          if (query.teacherId && responseText[query.teacherId]?.trim()) {
-                            handleRespondToQuery(query.teacherId);
+                          if (responseText[query.id]?.trim()) {
+                            handleRespondToQuery(query.id);
                           }
                         }}
-                        disabled={!query.teacherId || !responseText[query.teacherId]?.trim()}
+                        disabled={!responseText[query.id]?.trim()}
                         style={{ 
-                          backgroundColor: (!query.teacherId || !responseText[query.teacherId]?.trim()) ? '#d1d5db' : '#10b981',
+                          backgroundColor: !responseText[query.id]?.trim() ? '#d1d5db' : '#10b981',
                           color: 'white', 
                           padding: '0.75rem 1.5rem', 
                           borderRadius: '8px',
                           border: 'none',
                           fontSize: '0.95rem',
                           fontWeight: '600',
-                          cursor: (!query.teacherId || !responseText[query.teacherId]?.trim()) ? 'not-allowed' : 'pointer',
+                          cursor: !responseText[query.id]?.trim() ? 'not-allowed' : 'pointer',
                           transition: 'all 0.2s',
-                          boxShadow: (!query.teacherId || !responseText[query.teacherId]?.trim()) ? 'none' : '0 2px 4px rgba(16, 185, 129, 0.3)'
+                          boxShadow: !responseText[query.id]?.trim() ? 'none' : '0 2px 4px rgba(16, 185, 129, 0.3)'
                         }}
                         onMouseOver={(e) => {
-                          if (query.teacherId && responseText[query.teacherId]?.trim()) {
+                          if (responseText[query.id]?.trim()) {
                             e.currentTarget.style.backgroundColor = '#059669';
                           }
                         }}
                         onMouseOut={(e) => {
-                          if (query.teacherId && responseText[query.teacherId]?.trim()) {
+                          if (responseText[query.id]?.trim()) {
                             e.currentTarget.style.backgroundColor = '#10b981';
                           }
                         }}
                       >
-                        {query.response && responseText[query.teacherId!] ? '💾 Update Reply' : '📤 Send Reply'}
+                        {query.response && responseText[query.id] ? '💾 Update Reply' : '📤 Send Reply'}
                       </button>
-                      {query.response && responseText[query.teacherId!] && (
+                      {query.response && responseText[query.id] && (
                         <button
                           onClick={() => {
-                            if (query.teacherId) {
-                              setResponseText({ ...responseText, [query.teacherId]: '' });
-                            }
+                            setResponseText({ ...responseText, [query.id]: '' });
                           }}
                           style={{
                             padding: '0.75rem 1.5rem',

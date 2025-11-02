@@ -8,7 +8,7 @@ export interface StudentQueryRequest {
 }
 
 export interface StudentQueryResponse {
-  id?: number;
+  id: number;
   teacherId: number;
   teacherName?: string;
   subject: string;

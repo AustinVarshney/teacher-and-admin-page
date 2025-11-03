@@ -57,6 +57,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
   const [showQueryForm, setShowQueryForm] = useState(false);
   const [showLeaveForm, setShowLeaveForm] = useState(false);
   const [responseText, setResponseText] = useState<{[key: number]: string}>({});
+  const [leaveResponseText, setLeaveResponseText] = useState<{[key: number]: string}>({});
 
   // Video Lecture states
   const [videoLectures, setVideoLectures] = useState<VideoLecture[]>([]);
@@ -171,7 +172,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
       }
       await QueryService.respondToStudentQuery({ queryId, response });
       alert('Response sent successfully!');
-      setResponseText({ ...responseText, [queryId]: '' });
+      
+      // Clear the response text to hide the form
+      const newResponseText = { ...responseText };
+      delete newResponseText[queryId];
+      setResponseText(newResponseText);
+      
       fetchStudentQueries();
     } catch (err: any) {
       alert('Failed to send response: ' + err.message);
@@ -183,6 +189,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
     try {
       await LeaveService.takeActionOnStudentLeave(leaveId, { status, responseMessage });
       alert(`Leave request ${status.toLowerCase()} successfully!`);
+      
+      // Clear the leave response text to hide the form
+      const newLeaveResponseText = { ...leaveResponseText };
+      delete newLeaveResponseText[leaveId];
+      setLeaveResponseText(newLeaveResponseText);
+      
       fetchStudentLeaves();
     } catch (err: any) {
       alert('Failed to process leave request: ' + err.message);
@@ -1598,7 +1610,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                       {query.subject}
                     </h4>
                     <p style={{ margin: 0, fontSize: '0.85rem', color: '#6b7280' }}>
-                      👤 Student • 📅 {query.createdAt ? new Date(query.createdAt).toLocaleString() : 'N/A'}
+                      👤 {query.studentName || 'Student'} • 📅 {query.createdAt ? new Date(query.createdAt).toLocaleString() : 'N/A'}
                     </p>
                   </div>
                   <span style={{
@@ -1651,9 +1663,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                       <button
                         onClick={() => {
                           console.log('Editing response for query:', query);
-                          if (query.teacherId) {
-                            setResponseText({ ...responseText, [query.teacherId]: query.response || '' });
-                          }
+                          setResponseText({ ...responseText, [query.id]: query.response || '' });
                         }}
                         style={{
                           marginTop: '0.75rem',
@@ -2445,17 +2455,55 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                 backgroundColor: '#f3f4f6', 
                 borderRadius: '6px' 
               }}>
-                <p><strong>Your Response:</strong> {request.classTeacherResponse}</p>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  marginBottom: '0.5rem' 
+                }}>
+                  <p style={{ margin: 0, fontWeight: 'bold' }}>Your Response:</p>
+                  <button 
+                    onClick={() => {
+                      // Set leave as being edited
+                      setLeaveResponseText({ ...leaveResponseText, [request.id]: request.classTeacherResponse || '' });
+                    }}
+                    style={{
+                      backgroundColor: '#3b82f6',
+                      color: 'white',
+                      padding: '0.4rem 0.85rem',
+                      borderRadius: '6px',
+                      border: 'none',
+                      fontSize: '0.8rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.backgroundColor = '#2563eb';
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = '#3b82f6';
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                  >
+                    ✏️ Edit
+                  </button>
+                </div>
+                <p style={{ margin: 0 }}>{request.classTeacherResponse}</p>
               </div>
             )}
             <div className="leave-actions" style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-              {request.status === 'PENDING' && (
+              {(request.status === 'PENDING' || leaveResponseText[request.id] !== undefined) && (
                 <>
                   <input
                     type="text"
                     placeholder="Add remarks (optional)"
-                    value={responseText[request.id] || ''}
-                    onChange={(e) => setResponseText({ ...responseText, [request.id]: e.target.value })}
+                    value={leaveResponseText[request.id] || ''}
+                    onChange={(e) => setLeaveResponseText({ ...leaveResponseText, [request.id]: e.target.value })}
                     style={{ 
                       flex: 1, 
                       padding: '0.5rem', 
@@ -2465,7 +2513,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                   />
                   <button 
                     className="action-btn approve"
-                    onClick={() => handleLeaveAction(request.id, 'APPROVED', responseText[request.id] || 'Approved')}
+                    onClick={() => handleLeaveAction(request.id, 'APPROVED', leaveResponseText[request.id] || 'Approved')}
                     style={{ 
                       backgroundColor: '#10b981', 
                       color: 'white', 
@@ -2477,7 +2525,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                   </button>
                   <button 
                     className="action-btn reject"
-                    onClick={() => handleLeaveAction(request.id, 'REJECTED', responseText[request.id] || 'Rejected')}
+                    onClick={() => handleLeaveAction(request.id, 'REJECTED', leaveResponseText[request.id] || 'Rejected')}
                     style={{ 
                       backgroundColor: '#ef4444', 
                       color: 'white', 

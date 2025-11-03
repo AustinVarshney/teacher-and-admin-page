@@ -50,6 +50,7 @@ export interface TeacherResponse {
 }
 
 export interface NonTeachingStaffResponse {
+  id: number; // NonTeachingStaff entity ID
   name: string;
   email: string;
   qualification: string;
@@ -329,6 +330,27 @@ export class AdminService {
       throw new Error(response.data.message || 'Failed to fetch non-teaching staff');
     } catch (error: any) {
       const message = error.response?.data?.message || error.message || 'Failed to fetch non-teaching staff';
+      throw new Error(message);
+    }
+  }
+
+  // Update non-teaching staff
+  static async updateNonTeachingStaff(id: number, data: {
+    name: string;
+    email: string;
+    qualification?: string;
+    salaryGrade?: string;
+    contactNumber: string;
+    designation?: string;
+  }): Promise<void> {
+    try {
+      const response = await api.put(`/nts/update/${id}`, data);
+      
+      if (response.status < 200 || response.status >= 300) {
+        throw new Error(response.data.message || 'Failed to update non-teaching staff');
+      }
+    } catch (error: any) {
+      const message = error.response?.data?.message || error.message || 'Failed to update non-teaching staff';
       throw new Error(message);
     }
   }

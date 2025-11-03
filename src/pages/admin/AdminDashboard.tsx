@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './AdminDashboard.css';
 import StudentDetailView from './StudentDetailView';
 import TeacherDetailView from './TeacherDetailView';
+import NonTeachingStaffDetailView from './NonTeachingStaffDetailView';
 import SchoolProfileModal from './SchoolProfileModal';
 import UnifiedRegistration from './UnifiedRegistration';
 import SessionManagement from './SessionManagement';
@@ -45,6 +46,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [showStudentDetail, setShowStudentDetail] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<TeacherResponse | null>(null);
   const [showTeacherDetail, setShowTeacherDetail] = useState(false);
+  const [selectedNonTeachingStaff, setSelectedNonTeachingStaff] = useState<NonTeachingStaffResponse | null>(null);
+  const [showNonTeachingStaffDetail, setShowNonTeachingStaffDetail] = useState(false);
   const [showSchoolProfile, setShowSchoolProfile] = useState(false);
   
   // State for real data from database
@@ -316,6 +319,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const handleCloseTeacherDetail = () => {
     setShowTeacherDetail(false);
     setSelectedTeacher(null);
+  };
+
+  const handleViewNonTeachingStaff = (staff: NonTeachingStaffResponse) => {
+    setSelectedNonTeachingStaff(staff);
+    setShowNonTeachingStaffDetail(true);
+  };
+
+  const handleCloseNonTeachingStaffDetail = () => {
+    setShowNonTeachingStaffDetail(false);
+    setSelectedNonTeachingStaff(null);
   };
 
   const getFeeCatalog = async (studentPanNumber: string): Promise<FeeCatalog> => {
@@ -986,7 +999,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             ) : (
               <div className="staff-grid">
                 {filteredNonTeachingStaff.map((staff) => (
-                  <div key={staff.userId} className="staff-card">
+                  <div key={staff.id} className="staff-card">
                     <div className="staff-avatar">👷</div>
                     <div className="staff-info">
                       <h4>{staff.name}</h4>
@@ -1000,18 +1013,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                       </div>
                     </div>
                     <div className="staff-actions">
-                      <button className="action-btn">View Details</button>
+                      <button 
+                        className="action-btn"
+                        onClick={() => handleViewNonTeachingStaff(staff)}
+                      >
+                        View Details
+                      </button>
                       {staff.status === 'ACTIVE' ? (
                         <button 
                           className="action-btn deactivate-btn"
-                          onClick={() => handleDeactivateNonTeachingStaff(staff.userId)}
+                          onClick={() => handleDeactivateNonTeachingStaff(staff.id)}
                         >
                           Deactivate
                         </button>
                       ) : (
                         <button 
                           className="action-btn activate-btn"
-                          onClick={() => handleReactivateNonTeachingStaff(staff.userId)}
+                          onClick={() => handleReactivateNonTeachingStaff(staff.id)}
                         >
                           Reactivate
                         </button>
@@ -1294,24 +1312,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   // Handle responding to teacher query
   const handleRespondToTeacherQuery = async (queryId: number) => {
     try {
-      // Find the query to check its status
-      const query = teacherQueries.find(q => q.id === queryId);
-      console.log('Respond button clicked for query ID:', queryId, 'Query:', query);
-      if (!query) {
-        alert('Query not found');
-        return;
-      }
-
-      console.log('Current status of the query:', query.status);
-      console.log('Query Object:', query);
-      
-      // Check if query is still open
-      if (query.status !== 'OPEN') {
-        alert('This query has already been responded to or is no longer open');
-        await loadTeacherQueries(); // Refresh the list
-        return;
-      }
-
       const response = queryResponseText[queryId];
       if (!response || !response.trim()) {
         alert('Please enter a response');
@@ -1319,7 +1319,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       }
       await QueryService.respondToTeacherQuery({ queryId, response });
       alert('Response sent successfully!');
-      setQueryResponseText({ ...queryResponseText, [queryId]: '' });
+      
+      // Clear the response text to hide the form
+      const newQueryResponseText = { ...queryResponseText };
+      delete newQueryResponseText[queryId];
+      setQueryResponseText(newQueryResponseText);
+      
       await loadTeacherQueries();
     } catch (err: any) {
       alert('Failed to send response: ' + err.message);
@@ -1332,7 +1337,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       const adminResponse = leaveResponseText[leaveId] || (status === 'APPROVED' ? 'Approved' : 'Rejected');
       await LeaveService.updateStaffLeaveStatus(leaveId, { status, adminResponse });
       alert(`Leave request ${status.toLowerCase()} successfully!`);
-      setLeaveResponseText({ ...leaveResponseText, [leaveId]: '' });
+      
+      // Clear the response text to hide the form
+      const newLeaveResponseText = { ...leaveResponseText };
+      delete newLeaveResponseText[leaveId];
+      setLeaveResponseText(newLeaveResponseText);
+      
       await loadStaffLeaves();
     } catch (err: any) {
       alert('Failed to process leave request: ' + err.message);
@@ -1424,7 +1434,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                       alignItems: 'center',
                       gap: '0.25rem'
                     }}>
-                      👤 From Teacher
+                      👤 {query.teacherName || 'From Teacher'}
                     </span>
                     <span style={{ color: '#d1d5db' }}>•</span>
                     <span style={{ 
@@ -1484,9 +1494,42 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     fontSize: '0.95rem',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.5rem'
+                    justifyContent: 'space-between'
                   }}>
-                    ✅ Your Response:
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      ✅ Your Response:
+                    </span>
+                    <button 
+                      onClick={() => {
+                        // Set query as being edited
+                        setQueryResponseText({ ...queryResponseText, [query.id]: query.response || '' });
+                        // You could add a flag to show this is editing mode
+                      }}
+                      style={{
+                        backgroundColor: '#3b82f6',
+                        color: 'white',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        border: 'none',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.backgroundColor = '#2563eb';
+                        e.currentTarget.style.transform = 'scale(1.05)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.backgroundColor = '#3b82f6';
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                    >
+                      ✏️ Edit Response
+                    </button>
                   </p>
                   <p style={{ margin: '0 0 0.75rem', color: '#047857', lineHeight: '1.7', fontSize: '1rem' }}>
                     {query.response}
@@ -1499,8 +1542,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                 </div>
               )}
 
-              {/* Response Form for Open Queries */}
-              {query.status === 'OPEN' && (
+              {/* Response Form for Open Queries or Editing Responses */}
+              {(query.status === 'OPEN' || queryResponseText[query.id] !== undefined) && (
                 <div style={{ 
                   marginTop: '1.25rem',
                   backgroundColor: '#f8fafc',
@@ -1670,17 +1713,54 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                   backgroundColor: '#f3f4f6', 
                   borderRadius: '6px' 
                 }}>
-                  <p style={{ fontWeight: '500', marginBottom: '0.5rem' }}>Your Response:</p>
-                  <p style={{ color: '#374151' }}>{leave.adminResponse}</p>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    marginBottom: '0.5rem' 
+                  }}>
+                    <p style={{ fontWeight: '500', margin: 0 }}>Your Response:</p>
+                    <button 
+                      onClick={() => {
+                        // Set leave as being edited
+                        setLeaveResponseText({ ...leaveResponseText, [leave.id]: leave.adminResponse || '' });
+                      }}
+                      style={{
+                        backgroundColor: '#3b82f6',
+                        color: 'white',
+                        padding: '0.4rem 0.85rem',
+                        borderRadius: '6px',
+                        border: 'none',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.backgroundColor = '#2563eb';
+                        e.currentTarget.style.transform = 'scale(1.05)';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.backgroundColor = '#3b82f6';
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                    >
+                      ✏️ Edit
+                    </button>
+                  </div>
+                  <p style={{ color: '#374151', margin: '0 0 0.5rem' }}>{leave.adminResponse}</p>
                   {leave.processedBy && (
-                    <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                    <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.5rem', margin: 0 }}>
                       Processed by: {leave.processedBy}
                     </p>
                   )}
                 </div>
               )}
 
-              {leave.status === 'PENDING' && (
+              {(leave.status === 'PENDING' || leaveResponseText[leave.id] !== undefined) && (
                 <div style={{ marginTop: '1rem' }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
                     Remarks (optional):
@@ -1994,6 +2074,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               }
             } catch (error) {
               console.error('Failed to refresh teacher data:', error);
+            }
+          }}
+        />
+      )}
+
+      {/* Non-Teaching Staff Detail Modal */}
+      {showNonTeachingStaffDetail && selectedNonTeachingStaff && (
+        <NonTeachingStaffDetailView
+          staff={selectedNonTeachingStaff}
+          onClose={handleCloseNonTeachingStaffDetail}
+          onUpdate={async () => {
+            try {
+              // Refresh non-teaching staff list after update
+              await fetchAllData();
+              
+              // Fetch fresh staff data directly from API
+              if (selectedNonTeachingStaff) {
+                const freshStaffData = await AdminService.getNonTeachingStaffById(selectedNonTeachingStaff.id);
+                setSelectedNonTeachingStaff(freshStaffData);
+              }
+            } catch (error) {
+              console.error('Failed to refresh non-teaching staff data:', error);
             }
           }}
         />

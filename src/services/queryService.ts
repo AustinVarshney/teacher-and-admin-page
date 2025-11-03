@@ -9,6 +9,8 @@ export interface StudentQueryRequest {
 
 export interface StudentQueryResponse {
   id: number;
+  studentId?: number;
+  studentName?: string;
   teacherId: number;
   teacherName?: string;
   subject: string;
@@ -32,6 +34,8 @@ export interface TeacherQueryRequest {
 
 export interface TeacherQueryResponse {
   id: number;
+  teacherId?: number;
+  teacherName?: string;
   adminId?: number;
   adminName?: string;
   subject: string;

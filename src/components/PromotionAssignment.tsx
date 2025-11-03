@@ -260,7 +260,7 @@ const PromotionAssignment: React.FC<Props> = ({ classId, sessionId }) => {
                       disabled={assignment.isDetained || saving}
                       className="class-select"
                     >
-                      <option value="">1-B</option>
+                      <option value="">Select Class</option>
                       {availableClasses.map((cls) => (
                         <option key={cls.id} value={cls.id}>
                           {cls.className}

@@ -1084,7 +1084,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
       </div>
       <div className={`sidebar-overlay ${showSidebar ? 'show' : ''}`} onClick={() => setShowSidebar(false)} />
 
-      <main className="main-content">
+      <main className="main-content" style={{ marginTop: showSidebar ? '0' : '-659px' }}>
         {/* Loading State */}
         {loading && (
           <section className="profile-section">

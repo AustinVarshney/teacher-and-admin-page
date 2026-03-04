@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import './StudentDashboard.css';
 import './TCForm.css';
 import StudentService from '../../services/studentService';
@@ -137,6 +138,37 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
   const [tcLoading, setTcLoading] = useState(false);
   const [tcError, setTcError] = useState<string | null>(null);
   const [tcSuccess, setTcSuccess] = useState<string | null>(null);
+
+  // Memoize the pending request check to prevent flickering
+  const hasPendingTCRequest = useMemo(() => {
+    return tcRequests.some(req =>
+      req.status === 'PENDING' ||
+      req.status === 'FORWARDED_TO_TEACHER'
+    );
+  }, [tcRequests]);
+
+  // Lock body scroll when drawer is open
+  useEffect(() => {
+    if (showTCForm) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showTCForm]);
+
+  // Clear TC messages and close form when leaving TC tab
+  useEffect(() => {
+    if (activeTab !== 'tc') {
+      setTcError(null);
+      setTcSuccess(null);
+      setShowTCForm(false);
+    }
+  }, [activeTab]);
+
 
   // Load student data, timetable, and events from API
   useEffect(() => {
@@ -339,41 +371,27 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
   const fetchGalleryImages = async () => {
     try {
-      // Fetch gallery images from all sessions the student was enrolled in
-      // First, get all previous schooling records to know which sessions the student was in
-      const records = await PreviousSchoolingService.getMyPreviousSchoolingRecords();
-      const sessionIds = records.map(record => record.sessionId);
+      console.log('Fetching gallery images...');
       
-      // Also include current session if available
-      if (student?.sessionId && !sessionIds.includes(student.sessionId)) {
-        sessionIds.push(student.sessionId);
+      // Simplified: Just fetch all gallery images without session filtering
+      const images = await galleryService.getAllImages();
+      console.log('Fetched gallery images:', images);
+      
+      if (images && images.length > 0) {
+        setGallery(images.map(img => ({
+          id: img.id.toString(),
+          title: img.title || 'Gallery Image',
+          imageUrl: img.imageUrl,
+          description: img.description,
+          createdAt: img.createdAt
+        })));
+        console.log('Gallery state updated with', images.length, 'images');
+      } else {
+        console.log('No gallery images found');
+        setGallery([]);
       }
-      
-      // Fetch gallery images for all these sessions
-      const allImages: any[] = [];
-      for (const sessionId of sessionIds) {
-        try {
-          const images = await galleryService.getAllImages(sessionId);
-          allImages.push(...images);
-        } catch (err) {
-          console.warn(`No gallery images for session ${sessionId}:`, err);
-        }
-      }
-      
-      // Remove duplicates by ID
-      const uniqueImages = Array.from(
-        new Map(allImages.map(img => [img.id, img])).values()
-      );
-      
-      setGallery(uniqueImages.map(img => ({
-        id: img.id.toString(),
-        title: img.title || 'Gallery Image',
-        imageUrl: img.imageUrl,
-        description: img.description,
-        createdAt: img.createdAt
-      })));
     } catch (err) {
-      console.warn('Error fetching gallery images:', err);
+      console.error('Error fetching gallery images:', err);
       setGallery([]);
     }
   };
@@ -430,16 +448,27 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
   // Fetch Transfer Certificate requests
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchTCRequests = async () => {
       try {
         const requests = await TransferCertificateService.getMyTransferCertificateRequests();
-        setTcRequests(requests || []);
+        if (isMounted) {
+          setTcRequests(requests || []);
+        }
       } catch (err) {
         console.warn('No TC requests available:', err);
-        setTcRequests([]);
+        if (isMounted) {
+          setTcRequests([]);
+        }
       }
     };
+    
     fetchTCRequests();
+    
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Handle TC form submission
@@ -472,8 +501,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
       setShowTCForm(false);
       setTcSuccess('Transfer Certificate request submitted successfully!');
 
-      // Clear success message after 5 seconds
-      setTimeout(() => setTcSuccess(null), 5000);
+      // Clear success message after 5 seconds - no cleanup needed as it's within the async flow
 
     } catch (err: any) {
       setTcError(err.message || 'Failed to submit TC request');
@@ -953,7 +981,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
               </div>
             </div>
             <div className='ln-card'>
-            <button className="logout-button" onClick={onLogout}>⎋ Logout</button>
+            <button className="logout-button" onClick={onLogout}>Logout</button>
             <button
                 className={`notification-button ${showNotifications ? 'open' : ''}`}
                 onClick={() => setShowNotifications(!showNotifications)}
@@ -1149,7 +1177,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'enquiry' && (
           <section className="query-section">
-            <SectionHeader icon="📞" title="Teacher Contacts" />
+            <SectionHeader icon="" title="Teacher Contacts" />
             {loading ? (
               <div className="loading-message" style={{ textAlign: 'center', padding: '2rem' }}>Loading teacher contacts...</div>
             ) : enquiryContacts.length === 0 ? (
@@ -1196,14 +1224,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'lectures' && (
           <section className="events-section">
-            <SectionHeader icon="🎥" title="Video Lectures" />
+            <SectionHeader icon="" title="Video Lectures" />
             {loading ? (
               <div className="loading-message" style={{ textAlign: 'center', padding: '2rem' }}>
                 Loading video lectures...
               </div>
             ) : videoLectures.length === 0 ? (
               <div className="no-data-message" style={{ textAlign: 'center', padding: '2rem' }}>
-                <p>📹 No video lectures available yet.</p>
+                <p>No video lectures available yet.</p>
                 <p style={{ fontSize: '0.9rem', color: '#666' }}>
                   Video lectures uploaded by your teachers will appear here.
                 </p>
@@ -1253,7 +1281,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                         {v.description}
                       </div>
                       <div className="event-date" style={{ marginTop: '0.5rem' }}>
-                        📚 {v.subject}
+                        {v.subject}
                       </div>
                       {v.topic && (
                         <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
@@ -1262,12 +1290,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                       )}
                       {v.teacherName && (
                         <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
-                          👨‍🏫 {v.teacherName}
+                          {v.teacherName}
                         </div>
                       )}
                       {v.duration && (
                         <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
-                          ⏱️ {v.duration}
+                          ⏱{v.duration}
                         </div>
                       )}
 
@@ -1276,7 +1304,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                         style={{ marginTop: 'auto', width: '100%' }}
                         onClick={() => window.open(embedUrl, '_blank')}
                       >
-                        ▶️ Watch Video
+                        Watch Video
                       </button>
                     </div>
                   );
@@ -1373,7 +1401,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
           return (
             <section className="profile-section">
-              <SectionHeader icon="📅" title="Weekly Class Timetable" />
+              <SectionHeader icon="" title="Weekly Class Timetable" />
               {timetable.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
                   <p>No timetable available for your class yet.</p>
@@ -1575,7 +1603,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                       fontWeight: '600',
                       color: '#1f2937'
                     }}>
-                      📚 Teachers & Subjects
+                      Teachers & Subjects
                     </h3>
                     
                     <div style={{
@@ -1598,7 +1626,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                             
                             marginBottom: '0.5rem'
                           }}>
-                            👨‍🏫 {teacher}
+                            {teacher}
                           </div>
                           <div style={{
                             fontSize: '0.9rem',
@@ -1675,7 +1703,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 flexWrap: 'wrap',
                 gap: '1rem'
               }}>
-                <SectionHeader icon="🗓️" title={`Attendance — ${monthName} ${year}`} />
+                <SectionHeader icon="" title={`Attendance — ${monthName} ${year}`} />
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                   <select
                     value={selectedMonth}
@@ -1821,7 +1849,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'holidays' && (
           <section className="holidays-section">
-            <SectionHeader icon="🎉" title="Holiday List" />
+            <SectionHeader icon="" title="Holiday List" />
             {loading ? (
               <div style={{ textAlign: 'center', padding: '2rem' }}>Loading holidays...</div>
             ) : holidays.length === 0 ? (
@@ -1879,6 +1907,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                         </div> */}
                         <div style={{fontSize: '1.1rem', fontWeight: '600', textAlign: 'center'}}>
                           {h.name}
+                          
                         </div>
                         <div style={{
                           fontSize: '0.85rem',
@@ -1903,7 +1932,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
         {/* Events Tab - Using API Data */}
         {!loading && !error && activeTab === 'events' && (
           <section className="events-section">
-            <SectionHeader icon="🎈" title="Upcoming Events and Activities" />
+            <SectionHeader icon="" title="Upcoming Events and Activities" />
             {events.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
                 <p>No upcoming events scheduled at the moment.</p>
@@ -1934,7 +1963,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'results' && (
           <section className="results-section">
-            <SectionHeader icon="📊" title="Academic Results" />
+            <SectionHeader icon="" title="Academic Results" />
 
             {/* Loading State */}
             {resultsLoading && (
@@ -1981,7 +2010,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                     fontSize: '1rem'
                   }}
                 >
-                  � Retry
+                  Retry
                 </button>
               </div>
             )}
@@ -2029,7 +2058,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                         e.currentTarget.style.color = 'white';
                       }}
                     >
-                      {showMarksheetView ? '📋 Show Exam View' : '📊 Show Marksheet Table'}
+                      {showMarksheetView ? 'Show Exam View' : 'Show Marksheet Table'}
                     </button>
                   </div>
                 </div>
@@ -2068,7 +2097,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                             </h3>
                             {examResult.examDate && (
                               <p style={{ margin: 0, color: '#6b7280', fontSize: '0.9rem' }}>
-                                📅 {new Date(examResult.examDate).toLocaleDateString()}
+                                {new Date(examResult.examDate).toLocaleDateString()}
                               </p>
                             )}
                           </div>
@@ -2230,7 +2259,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                               fontWeight: '500'
                             }}
                           >
-                            📄 Download PDF
+                            Download PDF
                           </button>
                         </div>
                       </div>
@@ -2245,7 +2274,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                       backgroundColor: '#eff6ff'
                     }}>
                       <h4 style={{ margin: '0 0 1rem 0', color: '#1e40af' }}>
-                        📈 Overall Performance Summary
+                        Overall Performance Summary
                       </h4>
                       <div style={{
                         display: 'grid',
@@ -2304,7 +2333,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'fees' && (
           <section className="fees-section">
-            <SectionHeader icon="💳" title="Fees and Status" />
+            <SectionHeader icon="" title="Fees and Status" />
 
             {!feeData ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
@@ -2369,7 +2398,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'gallery' && (
           <section className="gallery-section">
-            <SectionHeader icon="🖼️" title="Gallery" />
+            <SectionHeader icon="" title="Gallery" />
             <div className="gallery-container">
               {gallery.length === 0 ? (
                 <div style={{
@@ -2442,7 +2471,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'transport' && (
           <section className="attendance-section">
-            <SectionHeader icon="🚌" title="Vehicle Route Timing" />
+            <SectionHeader icon="" title="Vehicle Route Timing" />
             <div className="fees-info">
               {routes.map(r => (
                 <p key={r.id}><strong>{r.route}:</strong> Pickup {r.pickup} • Drop {r.drop} {r.note ? `• ${r.note}` : ''}</p>
@@ -2453,7 +2482,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'queries' && (
           <section className="query-section">
-            <SectionHeader icon="❓" title="Ask Query" />
+            <SectionHeader icon="" title="Ask Query" />
             <form className="query-form" onSubmit={handleSubmitQuery}>
               <div className="form-group">
                 <label>Select Teacher & Subject</label>
@@ -2530,7 +2559,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'leave' && (
           <section className="query-section">
-            <SectionHeader icon="📝" title="Leave Request" />
+            <SectionHeader icon="" title="Leave Request" />
             <div className="query-form">
               <div className="form-group">
                 <label>Reason</label>
@@ -2669,7 +2698,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'tc' && (
           <section className="transfer-section">
-            <SectionHeader icon="📋" title="Transfer Certificate" />
+            <SectionHeader icon="" title="Transfer Certificate" />
 
             {/* Success/Error Messages */}
             {tcSuccess && (
@@ -2706,106 +2735,150 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                 <li>Once submitted, you can track the status of your request below.</li>
               </ul>
               {/* Check if there's already a pending or processing request */}
-              {(() => {
-                const hasPendingRequest = tcRequests.some(req =>
-                  req.status === 'PENDING' ||
-                  req.status === 'FORWARDED_TO_TEACHER'
-                );
-
-                return hasPendingRequest ? (
-                  <div style={{
-                    padding: '12px 16px',
-                    backgroundColor: '#fff3cd',
-                    color: '#856404',
-                    borderRadius: '6px',
-                    marginTop: '16px',
-                    border: '1px solid #ffeeba'
-                  }}>
-                    ⏳ You already have a pending transfer certificate request. Please wait for it to be processed.
-                  </div>
-                ) : (
-                  <button
-                    className="tc-btn"
-                    onClick={() => setShowTCForm(true)}
-                    disabled={tcLoading}
-                  >
-                    {tcLoading ? 'Processing...' : 'Request Transfer Certificate'}
-                  </button>
-                );
-              })()}
+              {hasPendingTCRequest ? (
+                <div style={{
+                  padding: '12px 16px',
+                  backgroundColor: '#fff3cd',
+                  color: '#856404',
+                  borderRadius: '6px',
+                  marginTop: '16px',
+                  border: '1px solid #ffeeba'
+                }}>
+                  You already have a pending transfer certificate request. Please wait for it to be processed.
+                </div>
+              ) : (
+                <button
+                  className="tc-btn"
+                  onClick={() => setShowTCForm(true)}
+                  disabled={tcLoading}
+                >
+                  {tcLoading ? 'Processing...' : 'Request Transfer Certificate'}
+                </button>
+              )}
             </div>
 
-            {/* TC Request Form Modal */}
-            {showTCForm && (
-              <div className="tc-modal-overlay">
-                <div className="tc-modal-content">
-                  <h2 className="tc-modal-title">📋 Transfer Certificate Request</h2>
+            {/* TC Request Form - Right Slide-in Drawer */}
+            {showTCForm && createPortal(
+              <>
+                {/* Backdrop Overlay */}
+                <div
+                  className="tc-drawer-overlay"
+                  onClick={() => {
+                    setShowTCForm(false);
+                    setTcError(null);
+                  }}
+                />
+                
+                {/* Drawer Container */}
+                <div className="tc-drawer">
+                  {/* Drawer Header */}
+                  <div className="tc-drawer-header">
+                    <div>
+                      <h3 className="tc-drawer-title">Transfer Certificate Request</h3>
+                      <p className="tc-drawer-subtitle">Please fill out the form below to request your transfer certificate</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="tc-drawer-close"
+                      onClick={() => {
+                        setShowTCForm(false);
+                        setTcError(null);
+                      }}
+                      aria-label="Close drawer"
+                    >
+                      ×
+                    </button>
+                  </div>
 
+                  {/* Error Message */}
                   {tcError && (
-                    <div className="tc-error-message">{tcError}</div>
+                    <div className="tc-error-message">
+                      <span>{tcError}</span>
+                    </div>
                   )}
 
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSubmitTCRequest();
-                  }}>
-                    <div className="tc-form-group">
-                      <label className="tc-form-label">
-                        Reason for Transfer <span className="tc-required">*</span>
-                      </label>
-                      <textarea
-                        className="tc-form-textarea"
-                        value={tcFormData.reason}
-                        onChange={(e) => handleTCFormChange('reason', e.target.value)}
-                        placeholder="Enter the reason for requesting transfer certificate"
-                        rows={5}
-                        required
-                      />
+                  {/* Form Section */}
+                  <form
+                    className="tc-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSubmitTCRequest();
+                    }}
+                  >
+                    <div className="tc-form-container">
+                      {/* Reason for Transfer */}
+                      <div className="tc-form-group">
+                        <label className="tc-form-label" htmlFor="tc-reason">
+                          Reason for Transfer <span className="tc-required">*</span>
+                        </label>
+                        <textarea
+                          id="tc-reason"
+                          className="tc-form-textarea"
+                          value={tcFormData.reason}
+                          onChange={(e) => handleTCFormChange("reason", e.target.value)}
+                          placeholder="Please explain your reason for requesting a transfer certificate..."
+                          rows={4}
+                          required
+                        />
+                        <span className="tc-field-hint">Provide a clear and detailed reason</span>
+                      </div>
+
+                      {/* Expected Transfer Date */}
+                      <div className="tc-form-group">
+                        <label className="tc-form-label" htmlFor="tc-date">
+                          Expected Transfer Date
+                        </label>
+                        <div className="tc-input-wrapper">
+                          <input
+                            id="tc-date"
+                            type="date"
+                            className="tc-form-input"
+                            value={tcFormData.transferDate}
+                            onChange={(e) => handleTCFormChange("transferDate", e.target.value)}
+                          />
+                        </div>
+                        <span className="tc-field-hint">When do you plan to transfer?</span>
+                      </div>
+
+                      {/* New School Details Section */}
+                      <div className="tc-section-divider">
+                        <span className="tc-section-title">New School Details (Optional)</span>
+                      </div>
+
+                      {/* New School Name */}
+                      <div className="tc-form-group">
+                        <label className="tc-form-label" htmlFor="tc-school-name">
+                          New School Name
+                        </label>
+                        <div className="tc-input-wrapper">
+                          <input
+                            id="tc-school-name"
+                            type="text"
+                            className="tc-form-input"
+                            value={tcFormData.newSchoolName}
+                            onChange={(e) => handleTCFormChange("newSchoolName", e.target.value)}
+                            placeholder="Enter the name of your new school"
+                          />
+                        </div>
+                      </div>
+
+                      {/* New School Address */}
+                      <div className="tc-form-group">
+                        <label className="tc-form-label" htmlFor="tc-school-address">
+                          New School Address
+                        </label>
+                        <textarea
+                          id="tc-school-address"
+                          className="tc-form-textarea"
+                          value={tcFormData.newSchoolAddress}
+                          onChange={(e) => handleTCFormChange("newSchoolAddress", e.target.value)}
+                          placeholder="Enter the complete address of your new school"
+                          rows={3}
+                        />
+                      </div>
                     </div>
 
-                    <div className="tc-form-group">
-                      <label className="tc-form-label">Expected Transfer Date</label>
-                      <input
-                        className="tc-form-input"
-                        type="date"
-                        value={tcFormData.transferDate}
-                        onChange={(e) => handleTCFormChange('transferDate', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="tc-form-group">
-                      <label className="tc-form-label">New School Name</label>
-                      <input
-                        className="tc-form-input"
-                        type="text"
-                        value={tcFormData.newSchoolName}
-                        onChange={(e) => handleTCFormChange('newSchoolName', e.target.value)}
-                        placeholder="Enter new school name"
-                      />
-                    </div>
-
-                    <div className="tc-form-group">
-                      <label className="tc-form-label">New School Address</label>
-                      <textarea
-                        className="tc-form-textarea"
-                        value={tcFormData.newSchoolAddress}
-                        onChange={(e) => handleTCFormChange('newSchoolAddress', e.target.value)}
-                        placeholder="Enter new school address"
-                        rows={4}
-                      />
-                    </div>
-
-                    <div className="tc-form-group">
-                      <label className="tc-form-label">Additional Details</label>
-                      <textarea
-                        className="tc-form-textarea"
-                        value={tcFormData.additionalDetails}
-                        onChange={(e) => handleTCFormChange('additionalDetails', e.target.value)}
-                        placeholder="Any additional information"
-                        rows={4}
-                      />
-                    </div>
-
+                    {/* Action Buttons */}
                     <div className="tc-form-actions">
                       <button
                         type="button"
@@ -2823,13 +2896,27 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
                         className="tc-btn-submit"
                         disabled={tcLoading || !tcFormData.reason}
                       >
-                        {tcLoading ? 'Submitting...' : 'Submit Request'}
+                        {tcLoading ? (
+                          <>
+                            <span className="tc-btn-spinner"></span>
+                            Submitting...
+                          </>
+                        ) : (
+                          <>
+                            Submit Request
+                          </>
+                        )}
                       </button>
                     </div>
                   </form>
                 </div>
-              </div>
+              </>,
+              document.body
             )}
+
+
+
+
 
             {/* TC Requests List */}
             {tcRequests.length > 0 && (
@@ -2897,12 +2984,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ onLogout }) => {
 
         {activeTab === 'history' && (
           <section className="previous-schools-section">
-            <SectionHeader icon="📚" title="Previous Schooling Records" />
+            <SectionHeader icon="" title="Previous Schooling Records" />
 
             {/* Loading State */}
             {previousSchoolingLoading && (
               <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
+                <div style={{ fontSize: '2rem', marginBottom: '1rem' }}></div>
                 <p>Loading your previous schooling records...</p>
               </div>
             )}

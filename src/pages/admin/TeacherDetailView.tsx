@@ -115,10 +115,9 @@ const TeacherDetailView: React.FC<TeacherDetailViewProps> = ({ teacher, onClose,
         {/* Header */}
         <div className="student-detail-header">
           <div className="header-left">
-            <div className="student-avatar teacher-avatar">
-              {teacher.name.charAt(0).toUpperCase()}
-            </div>
+            
             <div className="header-info">
+              
               <h2>{teacher.name}</h2>
               <div className="header-meta">
                 <span className="status-badge" style={{ 
@@ -136,13 +135,13 @@ const TeacherDetailView: React.FC<TeacherDetailViewProps> = ({ teacher, onClose,
               </div>
             </div>
           </div>
-          <div className="header-right">
+          <div className="header-right" style={{display:'flex',justifyContent:'center',margin:'10px 5px'}}>
             {!isEditing ? (
               <>
-                <button className="btn-edit" onClick={() => setIsEditing(true)}>
+                <button className="btn-edit"  onClick={() => setIsEditing(true)}>
                   <span>✏️</span> Edit
                 </button>
-                <button className="btn-close" onClick={onClose}>✕</button>
+                <button className="btn-close" style={{ padding:'20px 20px',marginRight:'10px'}} onClick={onClose}>✕</button>
               </>
             ) : (
               <>
@@ -150,6 +149,7 @@ const TeacherDetailView: React.FC<TeacherDetailViewProps> = ({ teacher, onClose,
                   className="btn-save" 
                   onClick={handleSave}
                   disabled={isSaving}
+                  
                 >
                   {isSaving ? 'Saving...' : '💾 Save'}
                 </button>

@@ -617,7 +617,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
       <div className="notifications-list">
         {notifications.length === 0 ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
-            <span style={{ fontSize: '3rem' }}>📭</span>
+            <span style={{ fontSize: '3rem' }}>No notifications</span>
             <p style={{ marginTop: '1rem' }}>No notifications yet</p>
           </div>
         ) : (
@@ -789,7 +789,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
             </div>
             <div className="profile-info" style={{ flex: 1 }}>
               <h2 style={{ 
-                margin: '0 0 1.5rem 0', 
+                margin: '0 0 0 0', 
                 fontSize: '2.5rem', 
                 fontWeight: '700',
                 textShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
@@ -797,13 +797,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
               }}>
                 {teacher.name}
               </h2>
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0' }}>
+              <div style={{ display: 'flex',flexDirection:'column' ,gap: '0.75rem', flexWrap: 'wrap', marginTop: '0' }}>
                 <span style={{
                   background: 'rgba(255, 255, 255, 0.25)',
                   padding: '0.5rem 1rem',
                   borderRadius: '20px',
                   fontSize: '0.95rem',
                   fontWeight: '500',
+                  textAlign:'center',
                   backdropFilter: 'blur(10px)',
                   border: '1px solid rgba(255, 255, 255, 0.3)'
                 }}>
@@ -814,24 +815,26 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                     background: 'rgba(255, 255, 255, 0.25)',
                     padding: '0.5rem 1rem',
                     borderRadius: '20px',
+                    textAlign:'center',
                     fontSize: '0.95rem',
                     fontWeight: '500',
                     backdropFilter: 'blur(10px)',
                     border: '1px solid rgba(255, 255, 255, 0.3)'
                   }}>
-                    📚 {teacher.qualification}
+                    {teacher.qualification}
                   </span>
                 )}
                 <span style={{
                   background: 'rgba(255, 255, 255, 0.25)',
                   padding: '0.5rem 1rem',
+                  textAlign:'center',
                   borderRadius: '20px',
                   fontSize: '0.95rem',
                   fontWeight: '500',
                   backdropFilter: 'blur(10px)',
                   border: '1px solid rgba(255, 255, 255, 0.3)'
                 }}>
-                  🏫 {teacher.currentSchool}
+                  {teacher.currentSchool}
                 </span>
               </div>
             </div>
@@ -858,7 +861,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                 fontWeight: '400',
                 letterSpacing: '0.5px',
                 color: 'white'
-              }}>📧 EMAIL</label>
+              }}>EMAIL</label>
               <span style={{ 
                 fontSize: '1rem', 
                 fontWeight: '600',
@@ -883,7 +886,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                   fontWeight: '400',
                   letterSpacing: '0.5px',
                   color: 'white'
-                }}>📱 MOBILE NUMBER</label>
+                }}>MOBILE NUMBER</label>
                 <span style={{ fontSize: '1rem', fontWeight: '600' }}>{teacher.mobileNumber}</span>
               </div>
             )}
@@ -905,7 +908,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                   fontWeight: '400',
                   letterSpacing: '0.5px',
                   color: 'white'
-                }}>🏠 ADDRESS</label>
+                }}>ADDRESS</label>
                 <span style={{ fontSize: '1rem', fontWeight: '600' }}>{teacher.personalInfo.address}</span>
               </div>
             )}
@@ -927,7 +930,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                   fontWeight: '400',
                   letterSpacing: '0.5px',
                   color: 'white'
-                }}>🚨 EMERGENCY CONTACT</label>
+                }}>EMERGENCY CONTACT</label>
                 <span style={{ fontSize: '1rem', fontWeight: '600' }}>{teacher.personalInfo.emergencyContact}</span>
               </div>
             )}
@@ -969,7 +972,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                   marginBottom: '0.5rem',
                   fontWeight: '400',
                   letterSpacing: '0.5px'
-                }}>🎂 DATE OF BIRTH</label>
+                }}>DATE OF BIRTH</label>
                 <span style={{ fontSize: '1rem', fontWeight: '600' }}>{teacher.personalInfo.dateOfBirth}</span>
               </div>
             )}
@@ -991,7 +994,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                   fontWeight: '400',
                   letterSpacing: '0.5px',
                   color: 'white'
-                }}>📅 JOINING DATE</label>
+                }}>JOINING DATE</label>
                 <span style={{ fontSize: '1rem', fontWeight: '600' }}>{teacher.personalInfo.joiningDate}</span>
               </div>
             )}
@@ -1102,7 +1105,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
               fontSize: '0.9rem',
               fontWeight: '600'
             }}>
-              🎉 Holiday
+              Holiday
             </div>
           </div>
           
@@ -1224,7 +1227,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
               marginBottom: '1rem'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.2rem' }}>📅</span>
+                <span style={{ fontSize: '1.2rem' }}></span>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Day</div>
                   <div style={{ fontSize: '0.9rem', fontWeight: '500', color: '#1f2937' }}>
@@ -1233,21 +1236,21 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.2rem' }}>🔢</span>
+                <span style={{ fontSize: '1.2rem' }}></span>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Period</div>
                   <div style={{ fontSize: '0.9rem', fontWeight: '500', color: '#1f2937' }}>{cls.periodNumber}</div>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.2rem' }}>⏰</span>
+                <span style={{ fontSize: '1.2rem' }}></span>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Time</div>
                   <div style={{ fontSize: '0.9rem', fontWeight: '500', color: '#1f2937' }}>{cls.startTime} - {cls.endTime}</div>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.2rem' }}>👥</span>
+                <span style={{ fontSize: '1.2rem' }}></span>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Students</div>
                   <div style={{ fontSize: '0.9rem', fontWeight: '500', color: '#1f2937' }}>{studentCounts[cls.classId] ?? cls.totalStudents ?? 0}</div>
@@ -1284,7 +1287,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                   setActiveTab('students');
                 }}
               >
-                👥 View Students
+                 View Students
               </button>
               <button 
                 className="action-btn"
@@ -1318,7 +1321,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                   setActiveTab('lectures'); // Redirect to video lectures tab
                 }}
               >
-                🎥 Upload Lecture
+                 Upload Lecture
               </button>
             </div>
           </div>
@@ -1344,7 +1347,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
       }}>
         <div>
           <h2 style={{ margin: 0, color: '#1f2937', fontSize: '1.5rem', fontWeight: '700' }}>
-            📬 Student Queries
+            Student Queries
           </h2>
           <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.9rem' }}>
             Manage and respond to student questions
@@ -1358,6 +1361,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
             padding: '0.75rem 1.5rem',
             borderRadius: '8px',
             border: 'none',
+            marginLeft:'10px',
             fontSize: '0.95rem',
             fontWeight: '600',
             cursor: 'pointer',
@@ -1370,7 +1374,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
           onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
           onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
         >
-          {showQueryForm ? '✕ Cancel' : '✉️ Query Admin'}
+          {showQueryForm ? 'Cancel' : 'Query Admin'}
         </button>
       </div>
 
@@ -1462,7 +1466,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
               boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
             }}
           >
-            📤 Submit Query
+             Submit Query
           </button>
         </div>
       )}
@@ -1479,7 +1483,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
             alignItems: 'center',
             gap: '0.5rem'
           }}>
-            <span style={{ fontSize: '1.5rem' }}>📨</span>
+            <span style={{ fontSize: '1.5rem' }}></span>
             My Queries to Admin ({myTeacherQueries.length})
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1507,7 +1511,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                       {query.subject}
                     </h4>
                     <p style={{ margin: 0, fontSize: '0.85rem', color: '#6b7280' }}>
-                      📅 Sent: {query.createdAt ? new Date(query.createdAt).toLocaleString() : 'N/A'}
+                       Sent: {query.createdAt ? new Date(query.createdAt).toLocaleString() : 'N/A'}
                     </p>
                   </div>
                   <span style={{
@@ -1519,7 +1523,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                     color: query.status === 'OPEN' ? '#92400e' : '#065f46',
                     whiteSpace: 'nowrap'
                   }}>
-                    {query.status === 'OPEN' ? '⏳ Pending' : '✅ Responded'}
+                    {query.status === 'OPEN' ? 'Pending' : 'Responded'}
                   </span>
                 </div>
 
@@ -1543,14 +1547,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                     borderLeft: '3px solid #10b981'
                   }}>
                     <p style={{ margin: '0 0 0.5rem', fontWeight: '600', color: '#065f46', fontSize: '0.9rem' }}>
-                      💬 Admin's Response:
+                      Admin's Response:
                     </p>
                     <p style={{ margin: 0, color: '#047857', lineHeight: '1.6' }}>
                       {query.response}
                     </p>
                     {query.respondedAt && (
                       <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#059669' }}>
-                        📅 {new Date(query.respondedAt).toLocaleString()}
+                        {new Date(query.respondedAt).toLocaleString()}
                       </p>
                     )}
                   </div>
@@ -1572,7 +1576,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
           alignItems: 'center',
           gap: '0.5rem'
         }}>
-          <span style={{ fontSize: '1.5rem' }}>👥</span>
+          <span style={{ fontSize: '1.5rem' }}></span>
           Queries from Students ({studentQueries.length})
         </h3>
 
@@ -1584,7 +1588,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
             borderRadius: '12px',
             border: '2px dashed #d1d5db'
           }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}></div>
             <p style={{ margin: 0, fontSize: '1.1rem', color: '#6b7280' }}>
               No student queries yet
             </p>
@@ -1610,7 +1614,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                       {query.subject}
                     </h4>
                     <p style={{ margin: 0, fontSize: '0.85rem', color: '#6b7280' }}>
-                      👤 {query.studentName || 'Student'} • 📅 {query.createdAt ? new Date(query.createdAt).toLocaleString() : 'N/A'}
+                      {query.studentName || 'Student'} •  {query.createdAt ? new Date(query.createdAt).toLocaleString() : 'N/A'}
                     </p>
                   </div>
                   <span style={{
@@ -1622,7 +1626,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                     color: query.status === 'OPEN' ? '#1e40af' : '#065f46',
                     whiteSpace: 'nowrap'
                   }}>
-                    {query.status === 'OPEN' ? '🔵 Open' : '✅ Replied'}
+                    {query.status === 'OPEN' ? 'Open' : 'Replied'}
                   </span>
                 </div>
 
@@ -1633,7 +1637,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                   marginBottom: '1rem'
                 }}>
                   <p style={{ margin: 0, fontWeight: '600', fontSize: '0.9rem', color: '#6b7280', marginBottom: '0.5rem' }}>
-                    ❓ Question:
+                     Question:
                   </p>
                   <p style={{ margin: 0, fontSize: '0.95rem', color: '#374151', lineHeight: '1.6' }}>
                     {query.content}
@@ -1649,14 +1653,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                     marginBottom: '1rem'
                   }}>
                     <p style={{ margin: '0 0 0.5rem', fontWeight: '600', color: '#065f46', fontSize: '0.9rem' }}>
-                      ✅ Your Reply:
+                      Your Reply:
                     </p>
                     <p style={{ margin: 0, color: '#047857', lineHeight: '1.6' }}>
                       {query.response}
                     </p>
                     {query.respondedAt && (
                       <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#059669' }}>
-                        📅 {new Date(query.respondedAt).toLocaleString()}
+                        {new Date(query.respondedAt).toLocaleString()}
                       </p>
                     )}
                     {query.status !== 'CLOSED' && (
@@ -1677,7 +1681,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                           fontWeight: 600
                         }}
                       >
-                        ✏️ Edit Response
+                        Edit Response
                       </button>
                     )}
                   </div>
@@ -1697,7 +1701,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                       color: '#1f2937',
                       fontSize: '0.95rem'
                     }}>
-                      💬 {query.response && responseText[query.id] ? 'Edit Your Response:' : 'Your Response:'}
+                      {query.response && responseText[query.id] ? 'Edit Your Response:' : 'Your Response:'}
                     </label>
                     <textarea
                       value={responseText[query.id] || ''}
@@ -1756,7 +1760,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                           }
                         }}
                       >
-                        {query.response && responseText[query.id] ? '💾 Update Reply' : '📤 Send Reply'}
+                        {query.response && responseText[query.id] ? 'Update Reply' : 'Send Reply'}
                       </button>
                       {query.response && responseText[query.id] && (
                         <button
@@ -1838,7 +1842,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
           border: '1px solid #e2e8f0'
         }}>
           <h4 style={{ marginTop: 0, color: '#1f2937' }}>
-            {editingVideo ? '✏️ Edit Video Lecture' : '📤 Upload New Video Lecture'}
+            {editingVideo ? 'Edit Video Lecture' : 'Upload New Video Lecture'}
           </h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
@@ -2000,7 +2004,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                 cursor: 'pointer'
               }}
             >
-              {editingVideo ? '💾 Update Lecture' : '📤 Upload Lecture'}
+              {editingVideo ? 'Update Lecture' : 'Upload Lecture'}
             </button>
             <button
               onClick={() => {
@@ -2173,7 +2177,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                       cursor: 'pointer'
                     }}
                   >
-                    ▶️ Watch
+                    Watch
                   </button>
                   <button
                     onClick={() => handleEditVideo(lecture)}
@@ -2188,7 +2192,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                       cursor: 'pointer'
                     }}
                   >
-                    ✏️ Edit
+                    Edit
                   </button>
                   <button
                     onClick={() => lecture.id && handleDeleteVideo(lecture.id)}
@@ -2232,7 +2236,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
             alignItems: 'center'
           }}>
             <div>
-              <h3 style={{ margin: '0 0 0.5rem 0', color: '#1e40af' }}>📅 Your Leave Allowance</h3>
+              <h3 style={{ margin: '0 0 0.5rem 0', color: '#1e40af' }}>Your Leave Allowance</h3>
               <p style={{ margin: 0, color: '#4b5563', fontSize: '0.95rem' }}>
                 Session: <strong>{leaveAllowance.sessionName || 'Current Session'}</strong>
               </p>
@@ -2490,7 +2494,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                       e.currentTarget.style.transform = 'scale(1)';
                     }}
                   >
-                    ✏️ Edit
+                    Edit
                   </button>
                 </div>
                 <p style={{ margin: 0 }}>{request.classTeacherResponse}</p>
@@ -2714,7 +2718,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
         }}>
           <div>
             <h2 style={{ margin: 0, color: '#1f2937', fontSize: '1.5rem', fontWeight: '700' }}>
-              ✓ Class Attendance
+              Class Attendance
             </h2>
             <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.9rem' }}>
               Mark attendance for your assigned class
@@ -2811,7 +2815,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
                   setShowMarkAttendance(true);
                 }}
               >
-                <span>✓</span>
+                <span></span>
                 <span>Mark Attendance</span>
               </button>
             </div>
@@ -2898,49 +2902,49 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onLogout }) => {
               className={`nav-item ${activeTab === 'home' ? 'active' : ''}`}
               onClick={() => setActiveTab('home')}
             >
-              🏠 Home
+              Home
             </button>
             <button
               className={`nav-item ${activeTab === 'classes' ? 'active' : ''}`}
               onClick={() => setActiveTab('classes')}
             >
-              📚 Assigned Classes
+              Assigned Classes
             </button>
             <button
               className={`nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
               onClick={() => setActiveTab('attendance')}
             >
-              ✓ Attendance
+              Attendance
             </button>
             <button
               className={`nav-item ${activeTab === 'promotion' ? 'active' : ''}`}
               onClick={() => setActiveTab('promotion')}
             >
-              ⬆️ Promote Students
+              Promote Students
             </button>
             <button
               className={`nav-item ${activeTab === 'queries' ? 'active' : ''}`}
               onClick={() => setActiveTab('queries')}
             >
-              ❓ Queries
+              Queries
             </button>
             <button
               className={`nav-item ${activeTab === 'lectures' ? 'active' : ''}`}
               onClick={() => setActiveTab('lectures')}
             >
-              📹 Video Lectures
+              Video Lectures
             </button>
             <button
               className={`nav-item ${activeTab === 'leave' ? 'active' : ''}`}
               onClick={() => setActiveTab('leave')}
             >
-              📝 Leave Requests
+             Leave Requests
             </button>
             <button
               className={`nav-item ${activeTab === 'students' ? 'active' : ''}`}
               onClick={() => setActiveTab('students')}
             >
-              👥 Student Information
+              Student Information
             </button>
           </nav>
         </aside>
